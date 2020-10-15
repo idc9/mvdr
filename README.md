@@ -21,14 +21,14 @@ Note the mvdr.ajive assumes you have installed `ya_pca` which can be found at [h
 ## Example
 
 ```python
-from mvdr.mcca.mcca import import MCCA
-from mvdr.mcca.k_mcca import import KMCCA
+from mvdr.mcca.mcca import MCCA
+from mvdr.mcca.k_mcca import KMCCA
 from mvdr.toy_data.joint_fact_model import sample_joint_factor_model
 
 # sample data from a joint factor model with 3 components
 # each data block is X_b = U diag(svals) W_b^T + E_b where
 # where the joint scores matrix U and each of the block loadings matrices, W_b, are orthonormal and E_b is a random noise matrix.
-Xs, U_true, Ws_true = rsample_joint_factor_model()
+Xs, U_true, Ws_true = sample_joint_factor_model()
 
 # fit MCCA (this is the SUMCORR-AVGVAR flavor of multi-CCA)
 mcca = MCCA(n_components=3).fit(Xs)
