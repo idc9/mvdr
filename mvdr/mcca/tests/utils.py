@@ -1,8 +1,8 @@
 import numpy as np
 from sklearn.utils import check_random_state
 
+from mvlearn.utils import check_Xs
 
-from mvdr.mcca.block_processing import get_blocks_metadata
 from mvdr.linalg_utils import normalize_cols
 from mvdr.mcca.mcca import check_regs, get_mcca_gevp_data
 
@@ -51,7 +51,9 @@ def check_mcca_scores_and_loadings(Xs, out,
     common_norm_scores = out['common_norm_scores']
     centerers = out['centerers']
 
-    n_blocks, n_samples, n_features = get_blocks_metadata(Xs)
+    Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                   return_dimensions=True)
+
 
     # make sure to apply centering transformations
     Xs = [centerers[b].transform(Xs[b]) for b in range(n_blocks)]
@@ -63,7 +65,7 @@ def check_mcca_scores_and_loadings(Xs, out,
 
     # check common norm scores are the column normalized sum of the
     # block scores
-    cns_pred = normalize_cols(sum(bs for bs in block_scores))
+    cns_pred = normalize_cols(sum(bs for bs in block_scores))[0]
     assert np.allclose(cns_pred, common_norm_scores)
 
     if check_normalization:
@@ -90,7 +92,9 @@ def check_mcca_gevp(Xs, out, regs):
     evals = out['evals']
     centerers = out['centerers']
 
-    n_blocks, n_samples, n_features = get_blocks_metadata(Xs)
+    Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                   return_dimensions=True)
+
     regs = check_regs(regs=regs, n_blocks=n_blocks)
 
     # make sure to apply centering transformations

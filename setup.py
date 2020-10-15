@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 #            return f.read()
 
 install_requires = ['numpy', 'scipy', 'scikit-learn', 'matplotlib', 'seaborn',
-                    'joblib']
+                    'joblib', 'mvlearn']
 
 
 setup(name='mvdr',

@@ -25,7 +25,7 @@ def test_mcca():
                 assert not out['centerers'][b].with_std
                 if params['center']:
                     assert np.allclose(out['centerers'][b].mean_,
-                                       Xs[b].mean(axis=1))
+                                       Xs[b].mean(axis=0))
                 else:
                     assert out['centerers'][b].mean_ is None
 
