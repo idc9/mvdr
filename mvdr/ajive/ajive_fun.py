@@ -6,6 +6,8 @@ import numbers
 from sklearn.linear_model import LinearRegression
 from textwrap import dedent
 
+from mvlearn.utils import check_Xs
+
 from mvdr.linalg_utils import svd_wrapper
 from mvdr.mcca.block_processing import center_blocks, get_blocks_metadata, \
     split
@@ -20,12 +22,14 @@ def ajive(Xs, init_signal_ranks, joint_rank=None, indiv_ranks=None,
           rand_percentile=95, n_rand_samples=1000, rand_seed=None,
           final_decomp=True,
           store_full=True, n_jobs=None):
+
+    Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                   return_dimensions=True)
+
     Xs, init_signal_ranks, indiv_ranks = \
         arg_checker(Xs, init_signal_ranks, joint_rank,
                     indiv_ranks, common_loading_method,
                     n_wedin_samples, n_rand_samples)
-
-    n_blocks, n_samples, n_features = get_blocks_metadata(Xs)
 
     Xs, centerers = center_blocks(Xs, center=center)
 

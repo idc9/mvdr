@@ -4,8 +4,10 @@ from warnings import warn
 from textwrap import dedent
 from sklearn.base import BaseEstimator, TransformerMixin
 
+from mvlearn.utils import check_Xs
+
 from mvdr.mcca.block_processing import center_kernel_blocks, split,\
-    get_blocks_metadata, initial_svds, process_block_kernel_args, \
+    initial_svds, process_block_kernel_args, \
     _block_kern_docs
 from mvdr.mcca.mcca import check_regs, mcca_det_output, \
     _mcca_docs
@@ -44,8 +46,8 @@ class KMCCA(BaseEstimator, TransformerMixin):
         Xs : list of array-likes or numpy.ndarray
             The list of data matrices each shaped (n_samples, n_features_b).
         """
+        Xs = check_Xs(Xs, multiview=True, return_dimensions=False)
         n_blocks = len(Xs)
-
         # set up kernels
         kernel, kernel_params = \
             process_block_kernel_args(n_blocks=n_blocks,
@@ -201,8 +203,8 @@ def k_mcca_evp_svd(Ks, n_components=None, center=True, regs=None,
                    signal_ranks=None, sval_thresh=1e-3, diag_mode='A',
                    precomp_svds=None):
 
-    n_blocks, n_samples = len(Ks), Ks[0].shape[0]
-
+    Ks, n_blocks, n_samples, _ = check_Xs(Ks, multiview=True,
+                                          return_dimensions=True)
     if sval_thresh is not None:
         # put sval_thresh on the scale of (1/n) K.
         # since we compute SVD of K, put _sval_thresh on scale of svals of K
@@ -224,7 +226,7 @@ def k_mcca_evp_svd(Ks, n_components=None, center=True, regs=None,
                      precomp_svds=precomp_svds,
                      sval_thresh=_sval_thresh)
 
-    n_features_reduced = get_blocks_metadata(reduced)[2]
+    n_features_reduced = [r.shape[1] for r in reduced]
     if n_components is None:
         n_components = sum(n_features_reduced)
     if n_components > sum(n_features_reduced):

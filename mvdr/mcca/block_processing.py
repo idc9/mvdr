@@ -326,31 +326,3 @@ def split(C, dims, axis=1):
         raise ValueError('axis must be either 0 or 1')
 
     return blocks
-
-
-def get_blocks_metadata(Xs):
-    """
-    Gets metadata for a list of data blocks.
-
-    Parameters
-    ----------
-    Xs : list of array-likes or numpy.ndarray
-        The list of data matrices each shaped (n_samples, n_features_b).
-
-    Output
-    ------
-    n_blocks: int
-        Number of data blocks.
-
-    n_samples: int
-        Number of samples (number of rows).
-
-    n_features: list of ints
-        Number of features in each data block.
-    """
-
-    n_blocks = len(Xs)
-    n_samples = Xs[0].shape[0]
-    n_features = [Xs[b].shape[1] for b in range(n_blocks)]
-
-    return n_blocks, n_samples, n_features

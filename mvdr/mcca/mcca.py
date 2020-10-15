@@ -5,10 +5,11 @@ from itertools import combinations
 from warnings import warn
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.covariance import ledoit_wolf, oas
-
 from textwrap import dedent
 
-from mvdr.mcca.block_processing import center_blocks, get_blocks_metadata, \
+from mvlearn.utils import check_Xs
+
+from mvdr.mcca.block_processing import center_blocks, \
     split, initial_svds
 from mvdr.linalg_utils import eigh_wrapper, svd_wrapper, normalize_cols
 from mvdr.mcca.MCCABlock import MCCABlock
@@ -27,6 +28,8 @@ class MCCA(BaseEstimator, TransformerMixin):
         self.i_mcca_method = i_mcca_method
 
     def fit(self, Xs, precomp_svds=None):
+
+        Xs = check_Xs(Xs, multiview=True, return_dimensions=False)
 
         if self.signal_ranks is not None:
             # perhaps give option to force
@@ -173,7 +176,8 @@ MCCA.__doc__ = dedent("""
 
 def mcca_gevp(Xs, n_components=None, center=True, regs=None):
 
-    n_blocks, n_samples, n_features = get_blocks_metadata(Xs)
+    Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                   return_dimensions=True)
 
     if n_components is None:
         n_components = sum(n_features)
@@ -251,7 +255,8 @@ def i_mcca(Xs, signal_ranks=None,
            n_components=None, center=True, regs=None, precomp_svds=None,
            method='auto'):
 
-    n_blocks, n_samples, n_features = get_blocks_metadata(Xs)
+    Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                   return_dimensions=True)
 
     if method == 'auto':
         if regs is not None:
@@ -277,7 +282,7 @@ def i_mcca(Xs, signal_ranks=None,
                      precomp_svds=precomp_svds)
 
     # set n_components
-    n_features_reduced = get_blocks_metadata(reduced)[2]
+    n_features_reduced = [r.shape[1] for r in reduced]
     if n_components is None:
         n_components = sum(n_features_reduced)
     elif n_components == 'min':
@@ -396,7 +401,9 @@ def get_mcca_gevp_data(Xs, regs=None, ret_lists=False):
     LHS v = lambda RHS v
 
     """
-    n_blocks, n_samples, n_features = get_blocks_metadata(Xs)
+    Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                   return_dimensions=True)
+
     regs = check_regs(regs=regs, n_blocks=n_blocks)
 
     LHS = [[None for b in range(n_blocks)]
@@ -532,7 +539,8 @@ def flag_mean(bases, n_components=None, weights=None):
     sqsvals: array-like, (n_components, )
         The squared singular values
     """
-    n_blocks, ambient_dim, subspace_dims = get_blocks_metadata(bases)
+    Xs, n_blocks, ambient_dim, subspace_dims = \
+        check_Xs(bases, multiview=True, return_dimensions=True)
 
     # optionally add weights to each subspace
     if weights is not None:

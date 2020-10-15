@@ -3,12 +3,12 @@ from warnings import warn
 from textwrap import dedent
 
 from ya_pca.PCA import PCA
+from mvlearn.utils import check_Xs
 
 from mvdr.mcca.mcca import MCCA
 from mvdr.mcca.MCCABlock import MCCABlock
 from mvdr.ajive.ajive_fun import ajive, _ajive_docs
 from mvdr.ajive.plot_ajive_diagnostic import plot_joint_diagnostic
-from mvdr.mcca.block_processing import get_blocks_metadata
 
 
 class AJIVE(BaseEstimator):
@@ -44,7 +44,8 @@ class AJIVE(BaseEstimator):
 
     def fit(self, Xs):
 
-        n_blocks, n_samples, n_features = get_blocks_metadata(Xs)
+        Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                       return_dimensions=True)
 
         if self.usr_joint_rank is not None and self.check_joint_identif:
             warn('usr_joint_rank has been specififed, but check joint identifiability is also True.')
