@@ -1,6 +1,6 @@
 # Multi-view dimensionality reduction
 
-A sklearn compatible python package for multi-view dimensionality reduction including multi-view canonical correlation analysis and [AJIVE](https://www.sciencedirect.com/science/article/pii/S0047259X1730204X).
+A sklearn compatible python package for multi-view dimensionality reduction including [multi-view canonical correlation analysis](docs/mcca_gevp_docs.pdf) and [AJIVE](https://www.sciencedirect.com/science/article/pii/S0047259X1730204X).
 
 
 ## Installation
@@ -15,6 +15,8 @@ pip install mvdr (coming soon!)
 git clone https://github.com/idc9/mvdr.git
 python setup.py install
 ```
+
+Note the mvdr.ajive assumes you have installed `ya_pca` which can be found at [https://github.com/idc9/ya_pca.git](https://github.com/idc9/ya_pca.git).
 
 ## Example
 
