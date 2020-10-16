@@ -49,49 +49,8 @@ class MCCABlock(TransformerMixin):
             reconst += m.reshape(1, -1)
         return reconst
 
-    def predict(self, X):
-        """
-        Predicts the reconstruction for a new dataset.
-
-        Parameters
-        ----------
-        X: None, array-like, shape(n_new_samples, n_features)
-
-        Output
-        -----
-        X_hat: array-like, shape (n_new_samples, n_features)
-
-        """
-        # project then map back
-        return self.inverse_transform(self.transform(X))
-
     def fit_transform(self, X, y=None):
         raise NotImplementedError
-
-    def score(self, X, y=None):
-        """
-        Computes the mean square error.
-        """
-        return np.mean(self.score_samples(X))
-
-    def score_samples(self, X):
-        """
-        Computes the squared reconstruction error i.e.
-        for each sample i.e.
-
-        ||x_hat_i - x_i||_2^2 for i =1, ..., n_new_samples
-
-        Parameters
-        ----------
-        X: array-like, shape (n_new_samples, n_features)
-
-        Output
-        ------
-        sq_diffs: shape (n_new_samples, )
-        """
-
-        X_hat = self.predict(X)
-        return np.linalg.norm(X - X_hat, axis=1) ** 2
 
 
 class KMCCABlock(TransformerMixin):
