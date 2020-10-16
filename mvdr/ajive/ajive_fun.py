@@ -33,6 +33,10 @@ def ajive(Xs, init_signal_ranks, joint_rank=None, indiv_ranks=None,
 
     Xs, centerers = center_views(Xs, center=center)
 
+    # if the user specifies the joint rank make sure they get what they specified!
+    if joint_rank is not None:
+        check_joint_identif = False
+
     ################################################################
     # step 1: initial signal space extraction by SVD on each view #
     ################################################################
