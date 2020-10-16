@@ -8,6 +8,7 @@ from mvlearn.utils import check_Xs
 from mvdr.mcca.mcca import MCCA, MCCAView
 from mvdr.ajive.ajive_fun import ajive, _ajive_docs
 from mvdr.ajive.plot_ajive_diagnostic import plot_joint_diagnostic
+from mvdr.linalg_utils import normalize_cols
 
 
 class AJIVE(BaseEstimator):
@@ -45,9 +46,6 @@ class AJIVE(BaseEstimator):
 
         Xs, n_views, n_samples, n_features = check_Xs(Xs, multiview=True,
                                                       return_dimensions=True)
-
-        if self.usr_joint_rank is not None and self.check_joint_identif:
-            warn('usr_joint_rank has been specififed, but check joint identifiability is also True.')
 
         usr_iniv_ranks = arg_checker(Xs=Xs,
                                      usr_iniv_ranks=self.usr_iniv_ranks)
@@ -231,6 +229,10 @@ def get_mcca_from_ajive_out(ajive_out):
     common.common_norm_scores_ = common_out['common_scores']
     common.evals_ = common_out['sqsvals']
 
+    cs_col_norms = normalize_cols(sum(vs for
+                                      vs in common_out['view_scores']))[1]
+    common.cs_col_norms_ = cs_col_norms
+
     n_views = len(ajive_out['centerers'])
     views = [None for b in range(n_views)]
     for b in range(n_views):
@@ -240,6 +242,9 @@ def get_mcca_from_ajive_out(ajive_out):
         views[b] = MCCAView(view_scores=bs,
                             view_loadings=bl,
                             centerer=cent)
+
+    common.views_ = views
+
     return common
 
 
