@@ -1,11 +1,11 @@
 import numpy as np
 from sklearn.utils import check_random_state
 
-from mvdr.ajive.utils import sample_parallel, sample_random_seeds
+from mvdr.utils import draw_samples, sample_random_seeds
 
 
 def get_wedin_samples(X, U, D, V, rank, n_samples=1000,
-                      random_state=None, n_jobs=None):
+                      random_state=None, n_jobs=None, backend=None):
     """
     Computes the wedin bound using the sample-project procedure. This method
     does not require the full SVD.
@@ -25,11 +25,16 @@ def get_wedin_samples(X, U, D, V, rank, n_samples=1000,
         Number of samples for resampling procedure
 
     random_state: int, None
+        Seed for random samples.
 
-    n_jobs: int, None
-        Number of jobs for parallel processing using
-        sklearn.externals.joblib.Parallel. If None, will not use parallel
-        processing.
+    n_jobs: None, -1, int
+        The maximum number of concurrently running jobs,
+        Number of cores to use. If None, will not sample in parralel.
+        If -1 will use all available cores. See joblib.Parallel.
+
+    backend: str, ParallelBackendBase instance or None, default: 'loky
+        Specify the parallelization backend implementation.
+        See joblib.Parallel
 
     """
     # TODO: what to do about seed for parallelism
@@ -37,18 +42,20 @@ def get_wedin_samples(X, U, D, V, rank, n_samples=1000,
     random_states = sample_random_seeds(2, random_state)
 
     basis = V[:, 0:rank]
-    V_norm_samples = sample_parallel(fun=_get_sample,
-                                     n_samples=n_samples,
-                                     random_state=random_states[0],
-                                     n_jobs=n_jobs,
-                                     X=X, basis=basis)
+    V_norm_samples = draw_samples(fun=_get_sample,
+                                  n_samples=n_samples,
+                                  random_state=random_states[0],
+                                  n_jobs=n_jobs,
+                                  backend=backend,
+                                  kws={'X': X, 'basis': basis})
 
     basis = U[:, 0:rank]
-    U_norm_samples = sample_parallel(fun=_get_sample,
-                                     n_samples=n_samples,
-                                     random_state=random_states[1],
-                                     n_jobs=n_jobs,
-                                     X=X.T, basis=basis)
+    U_norm_samples = draw_samples(fun=_get_sample,
+                                  n_samples=n_samples,
+                                  random_state=random_states[1],
+                                  n_jobs=n_jobs,
+                                  backend=backend,
+                                  kws={'X': X.T, 'basis': basis})
 
     V_norm_samples = np.array(V_norm_samples)
     U_norm_samples = np.array(U_norm_samples)

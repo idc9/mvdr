@@ -1,11 +1,12 @@
 import numpy as np
 from sklearn.utils import check_random_state
 
-from mvdr.ajive.utils import sample_parallel
+from mvdr.utils import draw_samples
 from mvdr.linalg_utils import rand_orthog
 
 
-def sample_randdir(n, dims, n_samples=1000, random_state=None, n_jobs=None):
+def sample_randdir(n, dims, n_samples=1000, random_state=None,
+                   n_jobs=None, backend=None):
     """
     Draws samples for the random direction bound.
 
@@ -20,13 +21,17 @@ def sample_randdir(n, dims, n_samples=1000, random_state=None, n_jobs=None):
     n_samples: int
         Number of samples to draw.
 
-    random_state: None, int
-        Seed for samples.
+    random_state: int, None
+        Seed for random samples.
 
-    n_jobs: int, None
-        Number of jobs for parallel processing using
-        sklearn.externals.joblib.Parallel. If None, will not use parallel
-        processing.
+    n_jobs: None, -1, int
+        The maximum number of concurrently running jobs,
+        Number of cores to use. If None, will not sample in parralel.
+        If -1 will use all available cores. See joblib.Parallel.
+
+    backend: str, ParallelBackendBase instance or None, default: 'loky
+        Specify the parallelization backend implementation.
+        See joblib.Parallel
 
     Output
     ------
@@ -36,12 +41,12 @@ def sample_randdir(n, dims, n_samples=1000, random_state=None, n_jobs=None):
 
     # TODO: what to do about seed for parallelism
 
-    random_sv_samples = sample_parallel(fun=_get_rand_sample,
-                                        n_jobs=n_jobs,
-                                        n_samples=n_samples,
-                                        random_state=random_state,
-                                        n=n,
-                                        dims=dims)
+    random_sv_samples = draw_samples(fun=_get_rand_sample,
+                                     n_samples=n_samples,
+                                     random_state=random_state,
+                                     n_jobs=n_jobs,
+                                     backend=backend,
+                                     kws={'n': n, 'dims': dims})
     return np.array(random_sv_samples)
 
 
