@@ -43,8 +43,15 @@ def get_principal_angles(A, B, n_components=None, is_ortho=True, deg=False):
         B_is_vec = True
 
     if not is_ortho:
-        A = np.linalg.qr(A)[0]
-        B = np.linalg.qr(B)[0]
+        if A_is_vec:
+            A /= np.linalg.norm(A)
+        else:
+            A = np.linalg.qr(A)[0]
+
+        if A_is_vec:
+            A /= np.linalg.norm(A)
+        else:
+            B = np.linalg.qr(B)[0]
 
     if A_is_vec and B_is_vec:
         cos_theta = A.T @ B
