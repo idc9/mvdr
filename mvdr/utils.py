@@ -64,7 +64,7 @@ def sample_random_seeds(n_seeds=1, random_state=None):
     return rng.randint(np.iinfo(np.int32).max, size=n_seeds)
 
 
-def draw_samples(fun, n_samples=1, n_jobs=None, backend=None,
+def draw_samples(fun, n_draws=1, n_jobs=None, backend=None,
                  random_state=None, args=[], kws={}):
     """
     Computes samples possibly in parralel using joblib.
@@ -75,7 +75,7 @@ def draw_samples(fun, n_samples=1, n_jobs=None, backend=None,
     fun: callable
         The sampling function. It should take random_state as a key word argument.
 
-    n_samples: int
+    n_draws: int
         Number of samples to draw.
 
     n_jobs: None, -1, int
@@ -105,13 +105,13 @@ def draw_samples(fun, n_samples=1, n_jobs=None, backend=None,
     if 'random_state' not in getargspec(fun).args:
         raise ValueError("func must take 'random_state' as an argument")
 
-    seeds = sample_random_seeds(n_samples, random_state)
+    seeds = sample_random_seeds(n_draws, random_state)
 
     if n_jobs is not None:
         return Parallel(n_jobs=n_jobs, backend=backend) \
-            (delayed(fun)(random_state=seeds[s],
-                          *args, **kws) for s in range(n_samples))
+            (delayed(fun)(random_state=seeds[d],
+                          *args, **kws) for d in range(n_draws))
 
     else:
         return [fun(random_state=seeds[s], *args, **kws)
-                for s in range(n_samples)]
+                for s in range(n_draws)]

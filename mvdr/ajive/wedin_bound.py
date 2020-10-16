@@ -4,7 +4,7 @@ from sklearn.utils import check_random_state
 from mvdr.utils import draw_samples, sample_random_seeds
 
 
-def get_wedin_samples(X, U, D, V, rank, n_samples=1000,
+def get_wedin_samples(X, U, D, V, rank, n_draws=1000,
                       random_state=None, n_jobs=None, backend=None):
     """
     Computes the wedin bound using the sample-project procedure. This method
@@ -21,8 +21,8 @@ def get_wedin_samples(X, U, D, V, rank, n_samples=1000,
     rank: int
         The rank of the signal space
 
-    n_samples: int
-        Number of samples for resampling procedure
+    n_draws: int
+        Number of samples to draw for resampling procedure.
 
     random_state: int, None
         Seed for random samples.
@@ -43,7 +43,7 @@ def get_wedin_samples(X, U, D, V, rank, n_samples=1000,
 
     basis = V[:, 0:rank]
     V_norm_samples = draw_samples(fun=_get_sample,
-                                  n_samples=n_samples,
+                                  n_draws=n_draws,
                                   random_state=random_states[0],
                                   n_jobs=n_jobs,
                                   backend=backend,
@@ -51,7 +51,7 @@ def get_wedin_samples(X, U, D, V, rank, n_samples=1000,
 
     basis = U[:, 0:rank]
     U_norm_samples = draw_samples(fun=_get_sample,
-                                  n_samples=n_samples,
+                                  n_draws=n_draws,
                                   random_state=random_states[1],
                                   n_jobs=n_jobs,
                                   backend=backend,
@@ -63,7 +63,7 @@ def get_wedin_samples(X, U, D, V, rank, n_samples=1000,
     sigma_min = D[rank - 1]  # TODO: double check -1
     wedin_bound_samples = [min(max(U_norm_samples[r],
                                    V_norm_samples[r]) / sigma_min, 1)
-                           for r in range(n_samples)]
+                           for r in range(n_draws)]
 
     return wedin_bound_samples
 

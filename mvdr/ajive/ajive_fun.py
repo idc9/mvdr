@@ -398,7 +398,7 @@ def estimate_joint_rank(Xs, init_signal_svd, common_svals,
 
     if n_rand_samples is not None:
         rand_sv_samples = sample_randdir(n=n_obs, dims=score_dims,
-                                         n_samples=n_rand_samples,
+                                         n_draws=n_rand_samples,
                                          random_state=rand_seed,
                                          n_jobs=n_jobs)
 
@@ -421,7 +421,7 @@ def estimate_joint_rank(Xs, init_signal_svd, common_svals,
                                   D=init_signal_svd[b]['svals'],
                                   V=init_signal_svd[b]['loadings'],
                                   rank=score_dims[b],
-                                  n_samples=n_wedin_samples,
+                                  n_draws=n_wedin_samples,
                                   random_state=wedin_seed,
                                   n_jobs=n_jobs)
 
