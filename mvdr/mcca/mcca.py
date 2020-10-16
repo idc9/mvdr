@@ -91,8 +91,8 @@ class MCCA(BaseEstimator, TransformerMixin):
                           for b in range(self.n_blocks_))
         return common_proj * (1 / self.cs_col_norms_)
 
-    def inverse_transform(self, X):
-        return [self.blocks_[b].inverse_transform(X)
+    def inverse_transform(self, Xs):
+        return [self.blocks_[b].inverse_transform(Xs[b])
                 for b in range(self.n_blocks_)]
 
 
