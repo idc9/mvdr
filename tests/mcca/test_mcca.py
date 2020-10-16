@@ -1,6 +1,6 @@
 import numpy as np
 
-from mvdr.mcca.tests.utils import check_mcca_gevp, \
+from .utils import check_mcca_gevp, \
     check_mcca_scores_and_loadings, generate_mcca_test_data, \
     generate_mcca_test_settings, check_mcca_class
 from mvdr.mcca.mcca import i_mcca, mcca_gevp, MCCA

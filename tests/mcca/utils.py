@@ -54,7 +54,6 @@ def check_mcca_scores_and_loadings(Xs, out,
     Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
                                                    return_dimensions=True)
 
-
     # make sure to apply centering transformations
     Xs = [centerers[b].transform(Xs[b]) for b in range(n_blocks)]
 

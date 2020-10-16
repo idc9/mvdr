@@ -1,4 +1,4 @@
-from mvdr.mcca.tests.utils import generate_mcca_test_data, \
+from .utils import generate_mcca_test_data, \
     generate_mcca_test_settings, compare_kmcca_to_mcca, check_mcca_class
 from mvdr.mcca.block_processing import get_block_kernels
 from mvdr.mcca.k_mcca import k_mcca_evp_svd, KMCCA
