@@ -79,8 +79,8 @@ def draw_samples(fun, n_draws=1, n_jobs=None, backend=None,
         Number of samples to draw.
 
     n_jobs: None, -1, int
-        The maximum number of concurrently running jobs,
-        Number of cores to use. If None, will not sample in parralel.
+        The maximum number of concurrently running jobs.
+        If None, will not sample in parralel.
         If -1 will use all available cores. See joblib.Parallel.
 
     backend: str, ParallelBackendBase instance or None, default: 'loky
