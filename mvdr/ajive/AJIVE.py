@@ -5,8 +5,7 @@ from textwrap import dedent
 from ya_pca.PCA import PCA
 from mvlearn.utils import check_Xs
 
-from mvdr.mcca.mcca import MCCA
-from mvdr.mcca.MCCABlock import MCCABlock
+from mvdr.mcca.mcca import MCCA, MCCAView
 from mvdr.ajive.ajive_fun import ajive, _ajive_docs
 from mvdr.ajive.plot_ajive_diagnostic import plot_joint_diagnostic
 
@@ -44,8 +43,8 @@ class AJIVE(BaseEstimator):
 
     def fit(self, Xs):
 
-        Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
-                                                       return_dimensions=True)
+        Xs, n_views, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                      return_dimensions=True)
 
         if self.usr_joint_rank is not None and self.check_joint_identif:
             warn('usr_joint_rank has been specififed, but check joint identifiability is also True.')
@@ -54,7 +53,7 @@ class AJIVE(BaseEstimator):
                                      usr_iniv_ranks=self.usr_iniv_ranks)
 
         assert self.init_signal_ranks is not None and \
-            len(self.init_signal_ranks) == n_blocks
+            len(self.init_signal_ranks) == n_views
 
         ajive_out = ajive(Xs=Xs,
                           init_signal_ranks=self.init_signal_ranks,
@@ -76,22 +75,22 @@ class AJIVE(BaseEstimator):
         self.common_ = get_mcca_from_ajive_out(ajive_out)
 
         ##################
-        # block specific #
+        # view specific #
         ##################
-        self.block_specific_ = {}
-        for b in range(n_blocks):
-            self.block_specific_[b] = BlockSpecificResults(
+        self.view_specific_ = {}
+        for b in range(n_views):
+            self.view_specific_[b] = ViewSpecificResults(
                 decomps=ajive_out['decomps'][b],
                 centerer=ajive_out['centerers'][b],
                 sv_threshold=ajive_out['sv_thresholds'][b],
-                block_idx=b)
+                view_idx=b)
 
         #############
         # other data #
         #############
 
         self.rank_est_ = ajive_out['rank_est']
-        self.n_blocks_ = n_blocks
+        self.n_views_ = n_views
 
         return self
 
@@ -102,28 +101,28 @@ class AJIVE(BaseEstimator):
         joint_rank: int
 
         indiv_ranks: dict of ints
-            The individual rank for each block.
+            The individual rank for each view.
         """
         return self.common_.n_components, \
-            [self.block_specific_[b].indiv_rank_
-             for b in range(self.n_blocks_)]
+            [self.view_specific_[b].indiv_rank_
+             for b in range(self.n_views_)]
 
     @property
     def is_fit(self):
         return hasattr(self, 'common_')
 
-    def get_block_decomps(self):
+    def get_view_decomps(self):
         """
         Output
         ------
         full: dict of dict of np.arrays
-            The joint, individual, and noise full estimates for each block.
+            The joint, individual, and noise full estimates for each view.
         """
         full = {}
-        for b in range(self.n_blocks_):
-            full[b] = {'joint': self.block_specific_[b].joint_.full_,
-                       'individual': self.block_specific_[b].individual_.full_,
-                       'noise': self.block_specific_[b].noise_}
+        for b in range(self.n_views_):
+            full[b] = {'joint': self.view_specific_[b].joint_.full_,
+                       'individual': self.view_specific_[b].individual_.full_,
+                       'noise': self.view_specific_[b].noise_}
 
         return full
 
@@ -135,8 +134,8 @@ class AJIVE(BaseEstimator):
         if self.is_fit:
             joint_rank, indiv_ranks = self.get_ranks()
             r = 'AJIVE, joint rank: {}'.format(joint_rank)
-            for b in range(self.n_blocks_):
-                r += ', block {} indiv rank: {}'.format(b, indiv_ranks[b])
+            for b in range(self.n_views_):
+                r += ', view {} indiv rank: {}'.format(b, indiv_ranks[b])
             return r
 
         else:
@@ -207,8 +206,8 @@ AJIVE.__doc__ = dedent("""
     common_: mvdr.mcca.MCCA
         Stores the common/joint space estimates as a MCCA object.
 
-    block_specific_: mvdr.ajive.AJIVE.BlockSpecificResults
-        Stores the block specific results including the block specific
+    view_specific_: mvdr.ajive.AJIVE.ViewSpecificResults
+        Stores the view specific results including the view specific
         joint and individual decompositions.
 
     rank_est_: dict
@@ -232,34 +231,34 @@ def get_mcca_from_ajive_out(ajive_out):
     common.common_norm_scores_ = common_out['common_scores']
     common.evals_ = common_out['sqsvals']
 
-    n_blocks = len(ajive_out['centerers'])
-    blocks = [None for b in range(n_blocks)]
-    for b in range(n_blocks):
-        bs = common_out['block_scores'][b]
-        bl = common_out['block_loadings'][b]
+    n_views = len(ajive_out['centerers'])
+    views = [None for b in range(n_views)]
+    for b in range(n_views):
+        bs = common_out['view_scores'][b]
+        bl = common_out['view_loadings'][b]
         cent = ajive_out['centerers'][b]
-        blocks[b] = MCCABlock(block_scores=bs,
-                              block_loadings=bl,
-                              centerer=cent)
+        views[b] = MCCAView(view_scores=bs,
+                            view_loadings=bl,
+                            centerer=cent)
     return common
 
 
 def arg_checker(Xs, usr_iniv_ranks):
 
-    n_blocks = len(Xs)
+    n_views = len(Xs)
 
     ################################
-    # parse block specific options #
+    # parse view specific options #
     ################################
 
-    block_indiv_ranks = [None for b in range(n_blocks)]
-    # block_init_svds = [None for b in range(n_blocks)]
+    view_indiv_ranks = [None for b in range(n_views)]
+    # view_init_svds = [None for b in range(n_views)]
 
     if usr_iniv_ranks is not None:
-        for b in range(n_blocks):
-            block_indiv_ranks[b] = usr_iniv_ranks[b]
+        for b in range(n_views):
+            view_indiv_ranks[b] = usr_iniv_ranks[b]
 
-    return block_indiv_ranks
+    return view_indiv_ranks
 
 
 def get_pca(decomps, centerer):
@@ -279,27 +278,27 @@ def get_pca(decomps, centerer):
     return pca
 
 
-class BlockSpecificResults(object):
+class ViewSpecificResults(object):
     """
-    Contains the block specific results.
+    Contains the view specific results.
 
     Attributes
     ----------
     joint_: ya_pca.PCA.PCA
-        Block specific joint PCA.
-        Has an extra attribute joint.full_ which contains the full block
+        View specific joint PCA.
+        Has an extra attribute joint.full_ which contains the full view
         joint estimate.
 
     individual_: ya_pca.PCA.PCA
-        Block specific individual PCA.
-        Has an extra attribute individual.full_ which contains the full block
+        View specific individual PCA.
+        Has an extra attribute individual.full_ which contains the full view
         individual estimate.
 
     noise_: array-like
-        The full noise block estimate.
+        The full noise view estimate.
 
-    block_idx_:
-        Index of this block.
+    view_idx_:
+        Index of this view.
 
     shape_: tuple
         (n_observations, n_features)
@@ -309,12 +308,12 @@ class BlockSpecificResults(object):
 
     """
     def __init__(self, decomps, centerer,
-                 sv_threshold=None, block_idx=None):
+                 sv_threshold=None, view_idx=None):
 
-        self.block_idx_ = block_idx
+        self.view_idx_ = view_idx
 
         ########################
-        # block specific joint #
+        # view specific joint #
         ########################
         if decomps['joint']['scores'] is None:
             self.joint_ = None
@@ -325,7 +324,7 @@ class BlockSpecificResults(object):
             self.joint_rank_ = self.joint_.n_components_
 
         #############################
-        # block specific individual #
+        # view specific individual #
         #############################
         if decomps['individual']['scores'] is None:
             self.individual_ = None
@@ -336,7 +335,7 @@ class BlockSpecificResults(object):
             self.individual_.full_ = decomps['individual']['full']
             self.indiv_rank_ = self.individual_.n_components_
         #################################
-        # block specific noise estimate #
+        # view specific noise estimate #
         ################################
         self.noise_ = decomps['noise']
 
@@ -344,5 +343,5 @@ class BlockSpecificResults(object):
         self.sv_threshold_ = sv_threshold
 
     def __repr__(self):
-        return 'Block: {}, individual rank: {}, joint rank: {}'.\
-            format(self.block_idx_, self.indiv_rank_, self.joint_rank_)
+        return 'View: {}, individual rank: {}, joint rank: {}'.\
+            format(self.view_idx_, self.indiv_rank_, self.joint_rank_)

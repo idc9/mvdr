@@ -46,7 +46,7 @@ def sample_joint_factor_model(n_samples=200, n_features=[10, 20, 30],
         The true view loadings matrices.
     """
     rng = check_random_state(random_state)
-    n_blocks = len(n_features)
+    n_views = len(n_features)
 
     view_loadings = [rand_orthog(d, joint_rank, random_state=rng)
                      for d in n_features]
@@ -58,6 +58,6 @@ def sample_joint_factor_model(n_samples=200, n_features=[10, 20, 30],
 
     Es = [noise_std * rng.normal(size=(n_samples, d))
           for d in n_features]
-    Xs = [(U * svals) @ view_loadings[b].T + Es[b] for b in range(n_blocks)]
+    Xs = [(U * svals) @ view_loadings[b].T + Es[b] for b in range(n_views)]
 
     return Xs, U, view_loadings

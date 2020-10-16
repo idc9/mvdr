@@ -12,7 +12,7 @@ def sample_part_shared_fact_model(ranks, svals,
                                   noise_std=1.0, m=1.5,
                                   random_state=None):
     """
-    Samples from a multi-block factor model with partially shared structures.
+    Samples from a multi-view factor model with partially shared structures.
 
     Parameters
     ----------
@@ -24,11 +24,11 @@ def sample_part_shared_fact_model(ranks, svals,
         Number of samples.
 
     dims: list of ints
-        Number of features in each data block.
+        Number of features in each data view.
 
     noise_std: float, list of floats
-        The noise standard deviation for each block.
-        If a float, uses the same noise STD for each block.
+        The noise standard deviation for each view.
+        If a float, uses the same noise STD for each view.
 
     m: float
         The signal strength.
@@ -38,10 +38,10 @@ def sample_part_shared_fact_model(ranks, svals,
 
     Output
     ------
-    blocks, info
+    views, info
 
-    block: list of array-like
-        The data blocks.
+    views: list of array-like
+        The data views.
 
     info: dict
         Other infomation including the true scores/loadings, etc.
@@ -49,19 +49,19 @@ def sample_part_shared_fact_model(ranks, svals,
 
     # bureaucracy
     rng = check_random_state(random_state)
-    n_blocks = len(n_features)
+    n_views = len(n_features)
 
     # setup noise std
     if isinstance(noise_std, Number):
-        noise_std = [noise_std] * n_blocks
-    assert len(noise_std) == n_blocks
+        noise_std = [noise_std] * n_views
+    assert len(noise_std) == n_views
 
-    # make sure all blocks are low ranks
-    K_tot, K_shared, block_ranks, block_indiv_ranks = \
-        get_rank_info(n_blocks=n_blocks, ranks=ranks)
+    # make sure all views are low ranks
+    K_tot, K_shared, view_ranks, view_indiv_ranks = \
+        get_rank_info(n_views=n_views, ranks=ranks)
     assert n_samples > K_tot
-    for b in range(n_blocks):
-        assert block_ranks[b] <= n_features[b]
+    for b in range(n_views):
+        assert view_ranks[b] <= n_features[b]
 
     # setup scores
     scores = rng.normal(size=(n_samples, K_tot), scale=1)
@@ -75,108 +75,108 @@ def sample_part_shared_fact_model(ranks, svals,
         signal_scores[S] = scores[:, L:R]
         L += ranks[S]
 
-    # sample block errors
+    # sample view errors
     errors = [noise_std[b] * rng.normal(size=(n_samples, n_features[b]))
-              for b in range(n_blocks)]
+              for b in range(n_views)]
 
-    # setup block loadings by sampling an orthonormal matrix
-    block_loadings = [{} for b in range(n_blocks)]
+    # setup view loadings by sampling an orthonormal matrix
+    view_loadings = [{} for b in range(n_views)]
     for S in ranks.keys():
         K = ranks[S]
         for b in S:
-            block_loadings[b][S] = rand_orthog(n=n_features[b], K=K,
-                                               random_state=rng)
+            view_loadings[b][S] = rand_orthog(n=n_features[b], K=K,
+                                              random_state=rng)
 
-    # setup block signal matices
-    block_signal_mats = [np.zeros((n_samples, n_features[b]))
-                         for b in range(n_blocks)]
+    # setup view signal matices
+    view_signal_mats = [np.zeros((n_samples, n_features[b]))
+                        for b in range(n_views)]
     for S in ranks.keys():
         for b in S:
 
-            W = block_loadings[b][S]
+            W = view_loadings[b][S]
             sv = svals[b][S]
             U = signal_scores[S]
 
-            block_signal_mats[b] += U @ diags(sv) @ W.T
+            view_signal_mats[b] += U @ diags(sv) @ W.T
 
-    # set data blocks
-    blocks = [None for b in range(n_blocks)]
-    for b in range(n_blocks):
-        blocks[b] = block_signal_mats[b] + errors[b]
+    # set data views
+    views = [None for b in range(n_views)]
+    for b in range(n_views):
+        views[b] = view_signal_mats[b] + errors[b]
 
-    return blocks, {'ranks': ranks,
-                    'svals': svals,
-                    'signal_scores': signal_scores,
-                    'block_signal_mats': block_signal_mats,
-                    'block_loadings': block_loadings}
+    return views, {'ranks': ranks,
+                   'svals': svals,
+                   'signal_scores': signal_scores,
+                   'view_signal_mats': view_signal_mats,
+                   'view_loadings': view_loadings}
 
 
-def get_part_shared_struct_ranks(n_blocks=3, rank=2,
+def get_part_shared_struct_ranks(n_views=3, rank=2,
                                  min_size=1, max_size=None):
     """
     Sets the signal rank for all possible partially shared structures.
 
     Parameters
     ----------
-    n_blocks: int
-        Number of blocks.
+    n_views: int
+        Number of views.
 
     rank: int
         The rank for all partially shared signal ranks.
 
     min_size: int
         Minimum size for partially shared sets; ignores sets smaller than this.
-        For example, if min_size=2 then there will be no block individual signals.
+        For example, if min_size=2 then there will be no view individual signals.
 
     min_size: int
         Maximum size for partially shared sets; ignores sets larget than this.
-        For example, if max_size=1 then there will be only block individual signals.
+        For example, if max_size=1 then there will be only view individual signals.
 
     Output
     ------
     ranks: dict
-        The keys of this dict are frozenset(S) where S in 2^{n_blocks}.
+        The keys of this dict are frozenset(S) where S in 2^{n_views}.
         The value is the rank corresponding to S.
     """
     ranks = {}
-    for S in powerset(x=range(n_blocks), min_size=min_size, max_size=max_size):
+    for S in powerset(x=range(n_views), min_size=min_size, max_size=max_size):
         ranks[frozenset(S)] = rank
     return ranks
 
 
-def get_rank_info(n_blocks, ranks):
+def get_rank_info(n_views, ranks):
     """
     Gets rank information from the partially shared ranks.
 
     Parameters
     ----------
-    n_blocks: int
-        Number of blocks.
+    n_views: int
+        Number of views.
 
     rank: dict
         The ranks for each partially shared structure.
-        The keys of this dict are frozenset(S) where S in 2^{n_blocks}.
+        The keys of this dict are frozenset(S) where S in 2^{n_views}.
         The value is the rank corresponding to S.
 
     Output
     ------
-    K_tot, K_shared, block_ranks, block_indiv_ranks
+    K_tot, K_shared, view_ranks, view_indiv_ranks
 
     K_tot: int
         Total signal rank.
 
     K_shared: int
-        Total signal rank of all shared signals (i.e. excludes block individual signals)
+        Total signal rank of all shared signals (i.e. excludes view individual signals)
 
-    block_ranks: list of int
-        The rank of each block.
+    view_ranks: list of int
+        The rank of each view.
 
-    block_indiv_ranks: list of int
-        The block individual rank for each block.
+    view_indiv_ranks: list of int
+        The view individual rank for each view.
     """
 
-    block_ranks = [0 for b in range(n_blocks)]
-    block_indiv_ranks = [0 for b in range(n_blocks)]
+    view_ranks = [0 for b in range(n_views)]
+    view_indiv_ranks = [0 for b in range(n_views)]
     K_tot = 0
     K_shared = 0
 
@@ -184,38 +184,38 @@ def get_rank_info(n_blocks, ranks):
         r = ranks[S]
 
         for b in S:
-            block_ranks[b] += r
+            view_ranks[b] += r
 
         K_tot += r
 
         if len(S) == 1:
-            block_indiv_ranks[b] = r
+            view_indiv_ranks[b] = r
 
         elif len(S) >= 2:
             K_shared += r
 
-    return K_tot, K_shared, block_ranks, block_indiv_ranks
+    return K_tot, K_shared, view_ranks, view_indiv_ranks
 
 # test cases
 # ranks = get_part_shared_struct_ranks(max_size=1)
-# get_rank_info(n_blocks=3, ranks=ranks)
+# get_rank_info(n_views=3, ranks=ranks)
 # ranks = get_part_shared_struct_ranks(min_size=2)
-# get_rank_info(n_blocks=3, ranks=ranks)
+# get_rank_info(n_views=3, ranks=ranks)
 # ranks = get_part_shared_struct_ranks()
-# get_rank_info(n_blocks=3, ranks=ranks)
+# get_rank_info(n_views=3, ranks=ranks)
 
 
 def scale_svals(svals, n_samples, n_features, noise_std, m=1.5):
 
-    n_blocks = len(n_features)
+    n_views = len(n_features)
 
     # setup noise std
     if isinstance(noise_std, Number):
-        noise_std = [noise_std] * n_blocks
-    assert len(noise_std) == n_blocks
+        noise_std = [noise_std] * n_views
+    assert len(noise_std) == n_views
 
     sval_bases = []
-    for b in range(n_blocks):
+    for b in range(n_views):
 
         # from equation (2.15) of (Choi et al, 2017).
         base = m * noise_std[b] * (n_samples * n_features[b]) ** (.25)
@@ -228,18 +228,18 @@ def scale_svals(svals, n_samples, n_features, noise_std, m=1.5):
     return svals
 
 
-def get_ps_sval_spikes(n_blocks, ranks, random_state=None):
+def get_ps_sval_spikes(n_views, ranks, random_state=None):
     """
     Gets (random) singular values for partially shared structures.
 
     Parameters
     ----------
-    n_blocks: int
-        Number of blocks.
+    n_views: int
+        Number of views.
 
     rank: dict
         The ranks for each partially shared structure.
-        The keys of this dict are frozenset(S) where S in 2^{n_blocks}.
+        The keys of this dict are frozenset(S) where S in 2^{n_views}.
         The value is the rank corresponding to S.
 
     random_state: None, int
@@ -254,14 +254,14 @@ def get_ps_sval_spikes(n_blocks, ranks, random_state=None):
 
     rng = check_random_state(random_state)
 
-    K_tot = get_rank_info(n_blocks=n_blocks, ranks=ranks)[0]
+    K_tot = get_rank_info(n_views=n_views, ranks=ranks)[0]
     # tot = 0
     # for S in ranks.keys():
     #     tot += len(S) * ranks[S]
     low = 1
     high = 1 + K_tot
 
-    svals = [{} for b in range(n_blocks)]
+    svals = [{} for b in range(n_views)]
     for S in ranks.keys():
         K = ranks[S]
         for b in S:
@@ -273,7 +273,7 @@ def get_ps_sval_spikes(n_blocks, ranks, random_state=None):
 def get_scaled_ps_sval_spikes(ranks, n_samples, n_features, noise_std, m=1.5,
                               random_state=None):
 
-    svals = get_ps_sval_spikes(n_blocks=len(n_features), ranks=ranks,
+    svals = get_ps_sval_spikes(n_views=len(n_features), ranks=ranks,
                                random_state=random_state)
 
     return scale_svals(svals=svals, n_samples=n_samples,

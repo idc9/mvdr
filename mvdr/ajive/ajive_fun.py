@@ -9,7 +9,7 @@ from textwrap import dedent
 from mvlearn.utils import check_Xs
 
 from mvdr.linalg_utils import svd_wrapper
-from mvdr.mcca.block_processing import center_blocks, get_blocks_metadata, \
+from mvdr.mcca.view_processing import center_views, \
     split
 from mvdr.ajive.wedin_bound import get_wedin_samples
 from mvdr.ajive.random_direction import sample_randdir
@@ -23,23 +23,23 @@ def ajive(Xs, init_signal_ranks, joint_rank=None, indiv_ranks=None,
           final_decomp=True,
           store_full=True, n_jobs=None):
 
-    Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
-                                                   return_dimensions=True)
+    Xs, n_views, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                  return_dimensions=True)
 
     Xs, init_signal_ranks, indiv_ranks = \
         arg_checker(Xs, init_signal_ranks, joint_rank,
                     indiv_ranks, common_loading_method,
                     n_wedin_samples, n_rand_samples)
 
-    Xs, centerers = center_blocks(Xs, center=center)
+    Xs, centerers = center_views(Xs, center=center)
 
     ################################################################
-    # step 1: initial signal space extraction by SVD on each block #
+    # step 1: initial signal space extraction by SVD on each view #
     ################################################################
 
-    init_signal_svd = [None for _ in range(n_blocks)]
-    sv_thresholds = [None for _ in range(n_blocks)]
-    for b in range(n_blocks):
+    init_signal_svd = [None for _ in range(n_views)]
+    sv_thresholds = [None for _ in range(n_views)]
+    for b in range(n_views):
 
         # signal rank + 1 to get individual rank sv threshold
         U, D, V = svd_wrapper(Xs[b], init_signal_ranks[b] + 1)
@@ -61,7 +61,7 @@ def ajive(Xs, init_signal_ranks, joint_rank=None, indiv_ranks=None,
     # this step estimates the joint rank and computes the common
     # joint space basis (the flag mean)
 
-    M = np.bmat([init_signal_svd[b]['scores'] for b in range(n_blocks)])
+    M = np.bmat([init_signal_svd[b]['scores'] for b in range(n_views)])
     rank = min(n_samples, *init_signal_ranks)
     common_scores, common_svals, common_loadings = svd_wrapper(M, rank=rank)
 
@@ -86,8 +86,8 @@ def ajive(Xs, init_signal_ranks, joint_rank=None, indiv_ranks=None,
         common_svals = None
         common_loadings = None
 
-        block_loadings = [None for b in range(n_blocks)]
-        block_scores = [None for b in range(n_blocks)]
+        view_loadings = [None for b in range(n_views)]
+        view_scores = [None for b in range(n_views)]
     else:
         # truncated common normalized scores
         common_scores = common_scores[:, 0:joint_rank]
@@ -105,52 +105,52 @@ def ajive(Xs, init_signal_ranks, joint_rank=None, indiv_ranks=None,
             rank_est_data['identif_dropped'] = dropped
 
         ############################################
-        # compute block common loadings and scores #
+        # compute view common loadings and scores #
         ############################################
         common_loadings = split(common_loadings,
                                 dims=init_signal_ranks, axis=0)
-        block_loadings = [None for b in range(n_blocks)]
+        view_loadings = [None for b in range(n_views)]
         if common_loading_method == 'map_back':
 
             # compute V_b L_b where
             # V_b are PCA loadings from the initial SVD and
-            # L_b are the block_common_loadings
+            # L_b are the view_common_loadings
             # this is equivalent to pricipal components regression.
-            for b in range(n_blocks):
+            for b in range(n_views):
 
                 # V D^{-1} W
-                block_loadings[b] = \
+                view_loadings[b] = \
                     np.multiply(init_signal_svd[b]['loadings'],
                                 1.0 / init_signal_svd[b]['svals']).\
                     dot(common_loadings[b])
 
         else:
-            for b in range(n_blocks):
-                block_loadings[b] = np.zeros((n_features[b], joint_rank))
+            for b in range(n_views):
+                view_loadings[b] = np.zeros((n_features[b], joint_rank))
                 for r in range(joint_rank):
 
-                    if block_loadings == 'regress':
+                    if view_loadings == 'regress':
                         # regress the common normalized scores
-                        # onto each data block
+                        # onto each data view
                         get_coef = LinRefCoef()
                     else:
-                        get_coef = block_loadings
+                        get_coef = view_loadings
 
-                    block_loadings[b][:, r] = \
+                    view_loadings[b][:, r] = \
                         get_coef(X=Xs[b], y=common_scores[r])
 
-        block_scores = [Xs[b].dot(block_loadings[b])
-                        for b in range(n_blocks)]
+        view_scores = [Xs[b].dot(view_loadings[b])
+                       for b in range(n_views)]
 
     #######################################
     # step 3: compute final decomposition #
     #######################################
-    # this step computes the block specific estimates
+    # this step computes the view specific estimates
 
     if final_decomp:
-        decomps = block_decomposition(Xs, common_scores, sv_thresholds,
-                                      indiv_ranks=indiv_ranks,
-                                      store_full=store_full)
+        decomps = view_decomposition(Xs, common_scores, sv_thresholds,
+                                     indiv_ranks=indiv_ranks,
+                                     store_full=store_full)
     else:
         decomps = None
 
@@ -159,8 +159,8 @@ def ajive(Xs, init_signal_ranks, joint_rank=None, indiv_ranks=None,
     else:
         sqsvals = None
 
-    return {'common': {'block_loadings': block_loadings,
-                       'block_scores': block_scores,
+    return {'common': {'view_loadings': view_loadings,
+                       'view_scores': view_scores,
                        'common_loadings': common_loadings,
                        'sqsvals': sqsvals,
                        'common_scores': common_scores,
@@ -190,8 +190,8 @@ _ajive_docs = dict(Xs=dedent("""
         These must be at most n_features_b - 1.
 
     center: bool or list
-        Whether or not to center data blocks.
-        Can pass in either one bool that applies to all blocks or a list of bools to specify different options for each block.
+        Whether or not to center data views.
+        Can pass in either one bool that applies to all views or a list of bools to specify different options for each view.
 
     common_loading_method: str
         How the common loadings are obtaind; must be one of
@@ -259,22 +259,23 @@ def arg_checker(Xs, init_signal_ranks, joint_rank, indiv_ranks,
     Checks arguments for AJIVE().fit()
     """
     ##########
-    # blocks #
+    # views #
     ##########
 
-    n_blocks, n_samples, n_features = get_blocks_metadata(Xs)
+    Xs, n_views, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                  return_dimensions=True)
 
-    if not n_blocks >= 2:
-        raise ValueError('At least two blocks must be provided.')
+    if not n_views >= 2:
+        raise ValueError('At least two views must be provided.')
 
-    # check blocks have the same number of observations
-    if len(set(Xs[b].shape[0] for b in range(n_blocks))) != 1:
+    # check views have the same number of observations
+    if len(set(Xs[b].shape[0] for b in range(n_views))) != 1:
         raise ValueError('Blocks must have same number'
                          ' of observations (rows).')
 
-    # format blocks
-    # make sure blocks are either csr or np.array
-    for b in range(n_blocks):
+    # format views
+    # make sure views are either csr or np.array
+    for b in range(n_views):
         if issparse(Xs[b]):  # TODO: allow for general linear operators
             raise NotImplementedError
         else:
@@ -284,14 +285,14 @@ def arg_checker(Xs, init_signal_ranks, joint_rank, indiv_ranks,
     # init_signal_ranks #
     #####################
 
-    if len(init_signal_ranks) != n_blocks:
-        raise ValueError('Each block must have an initial signal rank.')
+    if len(init_signal_ranks) != n_views:
+        raise ValueError('Each view must have an initial signal rank.')
 
-    # initial signal rank must be at least one lower than the shape of the block
-    for b in range(n_blocks):
+    # initial signal rank must be at least one lower than the shape of the view
+    for b in range(n_views):
         r = init_signal_ranks[b]
         if not (1 <= r) or not (r <= min(n_samples, n_features[b]) - 1):
-            raise ValueError('initial signal rank for block {} must be '
+            raise ValueError('initial signal rank for view {} must be '
                              'between 1 and min(n,d_b) - 1.'.format(b))
 
     ##############
@@ -310,16 +311,16 @@ def arg_checker(Xs, init_signal_ranks, joint_rank, indiv_ranks,
     # indiv_ranks #
     ###############
     if indiv_ranks is None:
-        indiv_ranks = [None for b in range(n_blocks)]
+        indiv_ranks = [None for b in range(n_views)]
 
-    if len(indiv_ranks) != n_blocks:
+    if len(indiv_ranks) != n_views:
         raise ValueError('If individual signal ranks are provided,'
-                         ' they must be provided for each block.')
+                         ' they must be provided for each view.')
 
-    for b in range(n_blocks):
+    for b in range(n_views):
         r = indiv_ranks[b]
         if not (r is None or isinstance(r, numbers.Number)):
-            raise ValueError('Individual signal rank provided for block {} '
+            raise ValueError('Individual signal rank provided for view {} '
                              'must be either None or a number'.format(b))
 
     ##########################
@@ -336,7 +337,7 @@ def arg_checker(Xs, init_signal_ranks, joint_rank, indiv_ranks,
             if max(n_features) >= n_samples:
                 raise ValueError('common_loading_method = regress is only'
                                  'available in low dimensional setting i.e.'
-                                 'the largest block dimension must be smaller'
+                                 'the largest view dimension must be smaller'
                                  ' than the number of samples')
 
     return Xs, init_signal_ranks, indiv_ranks
@@ -348,7 +349,7 @@ def estimate_joint_rank(Xs, init_signal_svd, common_svals,
                         rand_seed=None, wedin_seed=None,
                         n_jobs=-1):
     """
-    Estimates the joint rank of a collection of data blocks using the
+    Estimates the joint rank of a collection of data views using the
     random direction bound and wedin bound.
 
     Parameters
@@ -357,7 +358,7 @@ def estimate_joint_rank(Xs, init_signal_svd, common_svals,
         The original data matrices. These are only needed for the wedin bound.
 
     init_signal_svd: dict
-        The initial SVD/PCA of each data block.
+        The initial SVD/PCA of each data view.
 
     common_svals: list of floats
         The singular values from the SVD of the concatonated signal basis matrix. Note these are inversely releated to the principal angles.
@@ -380,12 +381,12 @@ def estimate_joint_rank(Xs, init_signal_svd, common_svals,
     # At least one of the bounds has to be in play
     assert sum([n_wedin_samples is None, n_rand_samples is None]) != 2
 
-    n_blocks = len(Xs)
+    n_views = len(Xs)
     n_obs = Xs[0].shape[0]
 
     # dimensions of the initial signal subspaces
     score_dims = [init_signal_svd[b]['scores'].shape[1]
-                  for b in range(n_blocks)]
+                  for b in range(n_views)]
 
     #############################################
     # estimate random direction bound threshold #
@@ -406,11 +407,11 @@ def estimate_joint_rank(Xs, init_signal_svd, common_svals,
     ##################################
     # estimate wedin bound threshold #
     ##################################
-    block_wedin_samples = [None for _ in range(n_blocks)]
+    view_wedin_samples = [None for _ in range(n_views)]
     if n_wedin_samples is not None:
 
-        for b in range(n_blocks):
-            block_wedin_samples[b] = \
+        for b in range(n_views):
+            view_wedin_samples[b] = \
                 get_wedin_samples(X=Xs[b],
                                   U=init_signal_svd[b]['scores'],
                                   D=init_signal_svd[b]['svals'],
@@ -421,8 +422,8 @@ def estimate_joint_rank(Xs, init_signal_svd, common_svals,
                                   n_jobs=n_jobs)
 
         wedin_sv_samples = len(Xs) - \
-            np.array([sum(block_wedin_samples[b][r] ** 2
-                      for b in range(n_blocks))
+            np.array([sum(view_wedin_samples[b][r] ** 2
+                      for b in range(n_views))
                      for r in range(n_wedin_samples)])
         wedin_threshold = np.percentile(wedin_sv_samples, wedin_percentile)
 
@@ -447,7 +448,7 @@ def estimate_joint_rank(Xs, init_signal_svd, common_svals,
                         'rand': {'samples': rand_sv_samples,
                                  'threshold': rand_threshold},
 
-                        'wedin': {'block_samples': block_wedin_samples,
+                        'wedin': {'view_samples': view_wedin_samples,
                                   'samples': wedin_sv_samples,
                                   'threshold': wedin_threshold}}
 
@@ -460,19 +461,19 @@ def check_identifiability(Xs, sv_thresholds,
     See page 15 on https://arxiv.org/pdf/1704.02060.pdf  (4th paragraph from the bottom)
     TODO: document
     """
-    n_blocks = len(Xs)
+    n_views = len(Xs)
     joint_rank = common_scores.shape[1]
 
     dropped = []
     # check identifiability constraint
     to_keep = set(range(joint_rank))
     for j in range(joint_rank):
-        for b in range(n_blocks):
+        for b in range(n_views):
 
             score = Xs[b].T.dot(common_scores[:, j])
             sv = np.linalg.norm(score)
 
-            # if sv is below the threshold for any data block remove j
+            # if sv is below the threshold for any data view remove j
             if sv < sv_thresholds[b]:
                 warnings.warn('removing flag mean component ' + str(j))
                 to_keep.remove(j)
@@ -488,17 +489,17 @@ def check_identifiability(Xs, sv_thresholds,
     return common_scores, common_svals, common_loadings, joint_rank, dropped
 
 
-def block_decomposition(blocks, common_scores, sv_thresholds=None,
-                        indiv_ranks=None,
-                        store_full=True,
-                        joint_decomp=True, indiv_decomp=True):
+def view_decomposition(views, common_scores, sv_thresholds=None,
+                       indiv_ranks=None,
+                       store_full=True,
+                       joint_decomp=True, indiv_decomp=True):
     """
-    Computes the AJIVE block decomposition and block PCAs for each data block.
+    Computes the AJIVE view decomposition and view PCAs for each data view.
 
     Parameters
     ----------
-    blocks: list of array-like
-        The original data blocks.
+    views: list of array-like
+        The original data views.
 
     common_scores: array-like, shape (n_obs, joint_rank)
         Estimate of common normalized scores.
@@ -507,7 +508,7 @@ def block_decomposition(blocks, common_scores, sv_thresholds=None,
         Thresholds for singular vaules.
 
     indiv_ranks: None, list of int/None
-        The user may specify the rank of each block's individual rank.
+        The user may specify the rank of each view's individual rank.
         If None, individual rank will be estimated.
 
     store_full: bool
@@ -532,24 +533,24 @@ def block_decomposition(blocks, common_scores, sv_thresholds=None,
         decomps[b]['noise'] only has key 'full'
     """
 
-    n_blocks = len(blocks)
+    n_views = len(views)
     if common_scores is not None:
         joint_rank = common_scores.shape[1]
     else:
         joint_rank = 0
 
     if indiv_ranks is None:
-        indiv_ranks = [None for _ in range(n_blocks)]
+        indiv_ranks = [None for _ in range(n_views)]
 
     if joint_rank == 0:
         joint_decomp = False
 
-    decomps = [{} for b in range(n_blocks)]
-    for b in range(n_blocks):
-        X = blocks[b]
+    decomps = [{} for b in range(n_views)]
+    for b in range(n_views):
+        X = views[b]
 
         ########################################
-        # step 3.1: block specific joint space #
+        # step 3.1: view specific joint space #
         ########################################
         # project X onto the joint space then compute SVD
         if joint_decomp:
@@ -562,7 +563,7 @@ def block_decomposition(blocks, common_scores, sv_thresholds=None,
         else:
             J, U, D, V = None, None, None, None
             # if store_full:
-            #     J = np.zeros(shape=blocks[bn].shape)
+            #     J = np.zeros(shape=views[bn].shape)
             # else:
             #     J = None
 
@@ -573,7 +574,7 @@ def block_decomposition(blocks, common_scores, sv_thresholds=None,
                                'rank': joint_rank}
 
         #############################################
-        # step 3.2: block specific individual space #
+        # step 3.2: view specific individual space #
         #############################################
         # project X onto the orthogonal complement of the joint space,
         # estimate the individual rank, then compute SVD
@@ -610,7 +611,7 @@ def block_decomposition(blocks, common_scores, sv_thresholds=None,
 
             if store_full:
                 if rank == 0:
-                    I = np.zeros(shape=blocks[b].shape)
+                    I = np.zeros(shape=views[b].shape)
                 else:
                     I = np.array(U.dot(np.diag(D).dot(V.T)))
             else:

@@ -9,7 +9,7 @@ from textwrap import dedent
 
 from mvlearn.utils import check_Xs
 
-from mvdr.mcca.block_processing import center_blocks, \
+from mvdr.mcca.view_processing import center_views, \
     split, initial_svds
 from mvdr.linalg_utils import eigh_wrapper, svd_wrapper, normalize_cols
 
@@ -49,32 +49,32 @@ class MCCA(BaseEstimator, TransformerMixin):
         self.cs_col_norms_ = out['cs_col_norms']
         self.evals_ = out['evals']
 
-        n_blocks = len(Xs)
-        self.blocks_ = [None for b in range(n_blocks)]
-        for b in range(n_blocks):
-            bs = out['block_scores'][b]
-            bl = out['block_loadings'][b]
+        n_views = len(Xs)
+        self.views_ = [None for b in range(n_views)]
+        for b in range(n_views):
+            bs = out['view_scores'][b]
+            bl = out['view_loadings'][b]
             cent = out['centerers'][b]
-            self.blocks_[b] = MCCABlock(block_scores=bs,
-                                        block_loadings=bl,
-                                        centerer=cent)
+            self.views_[b] = MCCAView(view_scores=bs,
+                                      view_loadings=bl,
+                                      centerer=cent)
 
         return self
 
     @property
-    def n_blocks_(self):
-        if hasattr(self, 'blocks_'):
-            return len(self.blocks_)
+    def n_views_(self):
+        if hasattr(self, 'views_'):
+            return len(self.views_)
 
     @property
-    def block_loadings_(self):
-        if hasattr(self, 'blocks_'):
-            return [blck.block_loadings_ for blck in self.blocks_]
+    def view_loadings_(self):
+        if hasattr(self, 'views_'):
+            return [blck.view_loadings_ for blck in self.views_]
 
     @property
-    def block_scores_(self):
-        if hasattr(self, 'blocks_'):
-            return [blck.block_scores_ for blck in self.blocks_]
+    def view_scores_(self):
+        if hasattr(self, 'views_'):
+            return [blck.view_scores_ for blck in self.views_]
 
     @property
     def n_components_(self):
@@ -86,26 +86,26 @@ class MCCA(BaseEstimator, TransformerMixin):
         return self.common_norm_scores_
 
     def transform(self, Xs):
-        common_proj = sum(self.blocks_[b].transform(Xs[b])
-                          for b in range(self.n_blocks_))
+        common_proj = sum(self.views_[b].transform(Xs[b])
+                          for b in range(self.n_views_))
         return common_proj * (1 / self.cs_col_norms_)
 
     def inverse_transform(self, Xs):
-        return [self.blocks_[b].inverse_transform(Xs[b])
-                for b in range(self.n_blocks_)]
+        return [self.views_[b].inverse_transform(Xs[b])
+                for b in range(self.n_views_)]
 
 
-class MCCABlock(TransformerMixin):
+class MCCAView(TransformerMixin):
 
-    def __init__(self, block_scores, block_loadings, centerer):
+    def __init__(self, view_scores, view_loadings, centerer):
 
-        self.block_scores_ = block_scores
-        self.block_loadings_ = block_loadings
+        self.view_scores_ = view_scores
+        self.view_loadings_ = view_loadings
         self.centerer_ = centerer
 
     def transform(self, X):
         """
-        Projects a new data matrix onto the block loadings.
+        Projects a new data matrix onto the view loadings.
 
         Parameters
         ----------
@@ -117,7 +117,7 @@ class MCCABlock(TransformerMixin):
         scores: array-like, shape (n_new_samples, n_components)
             The projections of the new data.
         """
-        return self.centerer_.transform(X).dot(self.block_loadings_)
+        return self.centerer_.transform(X).dot(self.view_loadings_)
 
     def inverse_transform(self, scores):
         """
@@ -157,30 +157,30 @@ _mcca_docs = dict(
             Different options for each data view can be provided by inputting a list of bools.
 
         regs: None, float, str, list
-            MCCA regularization for each data block, which can be important for high dimensional data. A value of 0 or None for all blocks corresponds to SUMCORR-AVGVAR MCCA. A value of 1 corresponds to partial least squares SVD in the case of 2 blocks and a natural generalization of this method for more than two blocks. Simple default regularization values can be obtained by passing in one of ['lw', 'oas'], which will use sklearn.covariance.ledoit_wolf or sklearn.covariance.oas. If a single value (None, float or str) is passed in that value will be used for every block. Different options for each data view can be provided by inputting a list.
+            MCCA regularization for each data view, which can be important for high dimensional data. A value of 0 or None for all views corresponds to SUMCORR-AVGVAR MCCA. A value of 1 corresponds to partial least squares SVD in the case of 2 views and a natural generalization of this method for more than two views. Simple default regularization values can be obtained by passing in one of ['lw', 'oas'], which will use sklearn.covariance.ledoit_wolf or sklearn.covariance.oas. If a single value (None, float or str) is passed in that value will be used for every view. Different options for each data view can be provided by inputting a list.
         """),
 
     score_out=dedent("""
         evals: array-like, (n_components, )
             The MCCA eigenvalues.
 
-        block_scores: list of array-like
-            Projections of each data block onto its block scores.
+        view_scores: list of array-like
+            Projections of each data view onto its view scores.
 
         common_norm_scores: array-like, (n_samples, n_components)
-            Normalized sum of the block scores.
+            Normalized sum of the view scores.
 
         cs_col_norms: array-like, (n_components, )
-            Column nomrs of the sum of the block scores.
+            Column nomrs of the sum of the view scores.
             Useful for projecting new data
         """),
 
     other_out=dedent("""
         centerers: list of sklearn.preprocessing.StandardScaler
-            The mean centering object for each block.
+            The mean centering object for each view.
 
-        block_loadings: list of array-like
-            The loadings for each block used to project new data.
+        view_loadings: list of array-like
+            The loadings for each view used to project new data.
             Each entry of the list is shaped (n_features_b, n_components).
         """)
 
@@ -204,17 +204,17 @@ MCCA.__doc__ = dedent("""
 
     Attributes
     ----------
-    blocks_: list of mvdr.mcca.MCCABlock.MCCABlock
+    views_: list of mvdr.mcca.MCCABlock.MCCABlock
         Containts the view level data for each data view.
 
     evals_: array-like, (n_components, )
             The MCCA eigenvalues.
 
     common_norm_scores_: array-like, (n_samples, n_components)
-        Normalized sum of the block scores.
+        Normalized sum of the view scores.
 
     cs_col_norms_: array-like, (n_components, )
-        Column nomrs of the sum of the block scores.
+        Column nomrs of the sum of the view scores.
         Useful for projecting new data.
     """.format(**_mcca_docs)
 )
@@ -222,8 +222,8 @@ MCCA.__doc__ = dedent("""
 
 def mcca_gevp(Xs, n_components=None, center=True, regs=None):
 
-    Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
-                                                   return_dimensions=True)
+    Xs, n_views, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                  return_dimensions=True)
 
     if n_components is None:
         n_components = sum(n_features)
@@ -239,41 +239,41 @@ def mcca_gevp(Xs, n_components=None, center=True, regs=None):
 
     # checking:
     # if no regularization
-    # check all blocks are low dimensional
+    # check all views are low dimensional
     # proably want sum(n_featues) <= n_samples or at least issue a warning if this is violated
 
-    # center data blocks
-    Xs, centerers = center_blocks(Xs, center=center)
+    # center data views
+    Xs, centerers = center_views(Xs, center=center)
 
     #########################################
     # solve generalized eigenvector problem #
     #########################################
     LHS, RHS = get_mcca_gevp_data(Xs=Xs, regs=regs)
 
-    gevals, block_loadings = eigh_wrapper(A=LHS, B=RHS, rank=n_components)
+    gevals, view_loadings = eigh_wrapper(A=LHS, B=RHS, rank=n_components)
 
     #################
     # Format output #
     #################
 
-    # set block scores and loadings
-    block_loadings = split(block_loadings, dims=n_features, axis=0)
-    block_scores = [Xs[b].dot(block_loadings[b]) for b in range(n_blocks)]
+    # set view scores and loadings
+    view_loadings = split(view_loadings, dims=n_features, axis=0)
+    view_scores = [Xs[b].dot(view_loadings[b]) for b in range(n_views)]
 
-    # common scores are the average of the block scores and are unit norm
+    # common scores are the average of the view scores and are unit norm
     # this is also the flag mean of the subspaces spanned by the columns
-    # of the blocks e.g. see (Draper et al., 2014)
-    common_scores = sum(bs for bs in block_scores)
+    # of the views e.g. see (Draper et al., 2014)
+    common_scores = sum(bs for bs in view_scores)
 
     # TODO: is this the behavior we want when regularization is used?
     common_norm_scores, col_norms = normalize_cols(common_scores)
 
     # enforce deterministic output due to possible sign flips
-    common_norm_scores, block_scores, block_loadings = \
-        mcca_det_output(common_norm_scores, block_scores, block_loadings)
+    common_norm_scores, view_scores, view_loadings = \
+        mcca_det_output(common_norm_scores, view_scores, view_loadings)
 
-    return {'block_scores': block_scores,
-            'block_loadings': block_loadings,
+    return {'view_scores': view_scores,
+            'view_loadings': view_loadings,
             'common_norm_scores': common_norm_scores,
             'cs_col_norms': col_norms,
             'evals': gevals,
@@ -301,8 +301,8 @@ def i_mcca(Xs, signal_ranks=None,
            n_components=None, center=True, regs=None, precomp_svds=None,
            method='auto'):
 
-    Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
-                                                   return_dimensions=True)
+    Xs, n_views, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                  return_dimensions=True)
 
     if method == 'auto':
         if regs is not None:
@@ -345,8 +345,8 @@ def i_mcca(Xs, signal_ranks=None,
     ################################
     if method == 'svd':
 
-        # left singluar vectors for each block
-        bases = [reduced[b] for b in range(n_blocks)]
+        # left singluar vectors for each view
+        bases = [reduced[b] for b in range(n_views)]
         results = flag_mean(bases, n_components=n_components)
 
         # rename flag mean output to correspond to MCCA conventions
@@ -354,14 +354,14 @@ def i_mcca(Xs, signal_ranks=None,
         results['evals'] = results.pop('sqsvals')
         results['cs_col_norms'] = np.sqrt(results['evals'])
 
-        # map the block loadings back into the original feature space
-        block_loadings = [None for _ in range(n_blocks)]
-        for b in range(n_blocks):
+        # map the view loadings back into the original feature space
+        view_loadings = [None for _ in range(n_views)]
+        for b in range(n_views):
             D_b = init_svds[b][1]
             V_b = init_svds[b][2]
             W_b = V_b * (1.0 / D_b)
-            block_loadings[b] = W_b.dot(results['block_loadings'][b])
-        results['block_loadings'] = block_loadings
+            view_loadings[b] = W_b.dot(results['view_loadings'][b])
+        results['view_loadings'] = view_loadings
 
     elif method == 'gevp':
 
@@ -370,9 +370,9 @@ def i_mcca(Xs, signal_ranks=None,
                             center=False,  # we already took care of this!
                             regs=regs)
 
-        # map the block loadings back into the original feature space
-        block_loadings = [None for _ in range(n_blocks)]
-        for b in range(n_blocks):
+        # map the view loadings back into the original feature space
+        view_loadings = [None for _ in range(n_views)]
+        for b in range(n_views):
 
             V_b = init_svds[b][2]
 
@@ -382,8 +382,8 @@ def i_mcca(Xs, signal_ranks=None,
             else:
                 W_b = V_b
 
-            block_loadings[b] = W_b.dot(results['block_loadings'][b])
-        results['block_loadings'] = block_loadings
+            view_loadings[b] = W_b.dot(results['view_loadings'][b])
+        results['view_loadings'] = view_loadings
 
     results['init_svds'] = init_svds
     results['centerers'] = centerers
@@ -406,7 +406,7 @@ i_mcca.__doc__ = dedent("""
         Different values can be provided for each view by inputting a list.
 
     precomp_svds: list of tuples
-        Precomputed SVDs for each block. The tuples should be in the form (U, D, V) where U and V are the matrices whose columns are the left/right singluar vectors and D is the array of singular values.
+        Precomputed SVDs for each view. The tuples should be in the form (U, D, V) where U and V are the matrices whose columns are the left/right singluar vectors and D is the array of singular values.
 
     method: str
         Whether or not to use the SVD based method (only works with no regularization) or the gevp based method. Must be one of ['auto', 'svd', 'gevp'].
@@ -418,7 +418,7 @@ i_mcca.__doc__ = dedent("""
     {other_out}
 
     init_svds: list of tuples
-        The initial SVDs of each block.
+        The initial SVDs of each view.
 
     """.format(**_mcca_docs))
 
@@ -433,10 +433,10 @@ def get_mcca_gevp_data(Xs, regs=None, ret_lists=False):
         The list of data matrices each shaped (n_samples, n_features_b).
 
     regs: None, float, list of floats
-        MCCA regularization for each data block, which can be important for high dimensional data. A value of 0 or None for all blocks corresponds to SUMCORR-AVGVAR MCCA. A value of 1 corresponds to partial least squares SVD in the case of 2 blocks and a natural generalization of this method for more than two blocks. Simple default regularization values can be obtained by passing in one of ['lw', 'oas'], which will use sklearn.covariance.ledoit_wolf or sklearn.covariance.oas. If a single value (None, float or str) is passed in that value will be used for every block. Different options for each data view can be provided by inputting a list.
+        MCCA regularization for each data view, which can be important for high dimensional data. A value of 0 or None for all views corresponds to SUMCORR-AVGVAR MCCA. A value of 1 corresponds to partial least squares SVD in the case of 2 views and a natural generalization of this method for more than two views. Simple default regularization values can be obtained by passing in one of ['lw', 'oas'], which will use sklearn.covariance.ledoit_wolf or sklearn.covariance.oas. If a single value (None, float or str) is passed in that value will be used for every view. Different options for each data view can be provided by inputting a list.
 
     ret_lists: bool
-        Return returns the blocks of the block matrices instead of the two matrices.
+        Return returns the views of the view matrices instead of the two matrices.
 
     Output
     ------
@@ -447,22 +447,22 @@ def get_mcca_gevp_data(Xs, regs=None, ret_lists=False):
     LHS v = lambda RHS v
 
     """
-    Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
-                                                   return_dimensions=True)
+    Xs, n_views, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                  return_dimensions=True)
 
-    regs = check_regs(regs=regs, n_blocks=n_blocks)
+    regs = check_regs(regs=regs, n_views=n_views)
 
-    LHS = [[None for b in range(n_blocks)]
-           for b in range(n_blocks)]
-    RHS = [None for b in range(n_blocks)]
+    LHS = [[None for b in range(n_views)]
+           for b in range(n_views)]
+    RHS = [None for b in range(n_views)]
 
     # cross covariance matrices
-    for (a, b) in combinations(range(n_blocks), 2):
+    for (a, b) in combinations(range(n_views), 2):
         LHS[a][b] = Xs[a].T @ Xs[b]
         LHS[b][a] = LHS[a][b].T
 
-    # block covariance matrices, possibly regularized
-    for b in range(n_blocks):
+    # view covariance matrices, possibly regularized
+    for b in range(n_views):
         if regs is None or regs[b] is None:
             RHS[b] = Xs[b].T @ Xs[b]
 
@@ -489,7 +489,7 @@ def get_mcca_gevp_data(Xs, regs=None, ret_lists=False):
     return LHS, RHS
 
 
-def mcca_det_output(common_scores, block_scores=None, block_loadings=None):
+def mcca_det_output(common_scores, view_scores=None, view_loadings=None):
     """
     Enforces determinsitic MCCA output. Makes largest absolute value entry
     of common scores positive.
@@ -498,33 +498,33 @@ def mcca_det_output(common_scores, block_scores=None, block_loadings=None):
     ----------
     common_scores: array-like
 
-    block_scores: list of array-like or None
+    view_scores: list of array-like or None
 
-    block_loadings: list of array-like or None
+    view_loadings: list of array-like or None
 
     Output
     ------
-    common_scores, block_scores, block_loadings
+    common_scores, view_scores, view_loadings
 
     """
 
     max_abs_cols = np.argmax(np.abs(common_scores), axis=0)
     signs = np.sign(common_scores[max_abs_cols, range(common_scores.shape[1])])
     common_scores = common_scores * signs
-    for b in range(len(block_scores)):
+    for b in range(len(view_scores)):
 
-        if block_scores is not None:
-            block_scores[b] = block_scores[b] * signs
+        if view_scores is not None:
+            view_scores[b] = view_scores[b] * signs
 
-        if block_loadings is not None:
-            block_loadings[b] = block_loadings[b] * signs
+        if view_loadings is not None:
+            view_loadings[b] = view_loadings[b] * signs
 
-    return common_scores, block_scores, block_loadings
+    return common_scores, view_scores, view_loadings
 
 
-def check_regs(regs, n_blocks):
+def check_regs(regs, n_views):
     """
-    Checks the regularization paramters for each block.
+    Checks the regularization paramters for each view.
     If the regulaization is not None, it must be a float between 0 and 1
 
     Parameters
@@ -532,21 +532,21 @@ def check_regs(regs, n_blocks):
     regs: None, float, list of floats
         Process the regs argument i.e. if a single value is passed in will return a list.
 
-    n_blocks: int
-        Number of blocks.
+    n_views: int
+        Number of views.
 
     Output
     ------
     regs: None, list of floats
     """
     if isinstance(regs, (Number, str)):
-        regs = [regs] * n_blocks
+        regs = [regs] * n_views
 
     if regs is not None:
-        assert len(regs) == n_blocks, \
-            "regs should be None or len(regs) == n_blocks"
+        assert len(regs) == n_views, \
+            "regs should be None or len(regs) == n_views"
 
-        for b in range(n_blocks):
+        for b in range(n_views):
             if regs[b] is not None:
                 if isinstance(regs[b], Number):
                     regs[b] = float(regs[b])
@@ -562,7 +562,7 @@ def check_regs(regs, n_blocks):
 
 def flag_mean(bases, n_components=None, weights=None):
     """
-    Computes the subspae flag mean (Draper et al, 2014). Given a colletion of orthonormal matrices, X_1, ..., X_B we compute the the low rank SVD of X := [X_1, ..., X_B]. The left singular vectors are the flag mean. We refer to the right singular vectors as the "block loadings". We further refer to the projetion of each block onto its corresponding entries of the block loadings as the block scores.
+    Computes the subspae flag mean (Draper et al, 2014). Given a colletion of orthonormal matrices, X_1, ..., X_B we compute the the low rank SVD of X := [X_1, ..., X_B]. The left singular vectors are the flag mean. We refer to the right singular vectors as the "view loadings". We further refer to the projetion of each view onto its corresponding entries of the view loadings as the view scores.
 
     Parameters
     ----------
@@ -577,7 +577,7 @@ def flag_mean(bases, n_components=None, weights=None):
 
     Output
     ------
-    dict with entries: flag_mean, sqsvals, block_scores, block_loadings
+    dict with entries: flag_mean, sqsvals, view_scores, view_loadings
 
     flag_mean: array-like, (ambient_dim, n_components)
         Flag mean orthonormal basis matrix.
@@ -585,29 +585,29 @@ def flag_mean(bases, n_components=None, weights=None):
     sqsvals: array-like, (n_components, )
         The squared singular values
     """
-    Xs, n_blocks, ambient_dim, subspace_dims = \
+    Xs, n_views, ambient_dim, subspace_dims = \
         check_Xs(bases, multiview=True, return_dimensions=True)
 
     # optionally add weights to each subspace
     if weights is not None:
-        assert len(weights) == n_blocks
-        for b in range(n_blocks):
+        assert len(weights) == n_views
+        for b in range(n_views):
             assert weights[b] > 0
             bases[b] = bases[b] * weights[b]
 
     # compte SVD of concatenated basis matrix
-    flag_mean, svals, block_loadings = svd_wrapper(np.block(bases),
-                                                   rank=n_components)
+    flag_mean, svals, view_loadings = svd_wrapper(np.block(bases),
+                                                  rank=n_components)
 
-    # get the block loadings and scores
-    block_loadings = split(block_loadings, dims=subspace_dims, axis=0)
-    block_scores = [bases[b] @ block_loadings[b]
-                    for b in range(n_blocks)]
+    # get the view loadings and scores
+    view_loadings = split(view_loadings, dims=subspace_dims, axis=0)
+    view_scores = [bases[b] @ view_loadings[b]
+                   for b in range(n_views)]
 
-    flag_mean, block_scores, block_loadings = \
-        mcca_det_output(flag_mean, block_scores, block_loadings)
+    flag_mean, view_scores, view_loadings = \
+        mcca_det_output(flag_mean, view_scores, view_loadings)
 
     return {'flag_mean': flag_mean,
             'sqsvals': svals ** 2,
-            'block_scores': block_scores,
-            'block_loadings': block_loadings}
+            'view_scores': view_scores,
+            'view_loadings': view_loadings}

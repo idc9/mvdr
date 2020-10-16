@@ -7,9 +7,9 @@ from sklearn.metrics.pairwise import pairwise_kernels
 
 from mvlearn.utils import check_Xs
 
-from mvdr.mcca.block_processing import center_kernel_blocks, split,\
-    initial_svds, process_block_kernel_args, \
-    _block_kern_docs
+from mvdr.mcca.view_processing import center_kernel_views, split,\
+    initial_svds, process_view_kernel_args, \
+    _view_kern_docs
 from mvdr.mcca.mcca import check_regs, mcca_det_output, \
     _mcca_docs
 from mvdr.linalg_utils import eigh_wrapper, normalize_cols
@@ -47,21 +47,21 @@ class KMCCA(BaseEstimator, TransformerMixin):
             The list of data matrices each shaped (n_samples, n_features_b).
         """
         Xs = check_Xs(Xs, multiview=True, return_dimensions=False)
-        n_blocks = len(Xs)
+        n_views = len(Xs)
         # set up kernels
         kernel, kernel_params = \
-            process_block_kernel_args(n_blocks=n_blocks,
-                                      kernel=self.kernel,
-                                      kernel_params=self.kernel_params)
+            process_view_kernel_args(n_views=n_views,
+                                     kernel=self.kernel,
+                                     kernel_params=self.kernel_params)
 
-        self.blocks_ = [None for b in range(n_blocks)]
-        for b in range(n_blocks):
-            self.blocks_[b] = KMCCABlock(kernel=kernel[b],
-                                         kernel_params=kernel_params[b],
-                                         filter_params=self.filter_params,
-                                         n_jobs=self.n_jobs)
+        self.views_ = [None for b in range(n_views)]
+        for b in range(n_views):
+            self.views_[b] = KMCCAView(kernel=kernel[b],
+                                       kernel_params=kernel_params[b],
+                                       filter_params=self.filter_params,
+                                       n_jobs=self.n_jobs)
 
-        Ks = [self.blocks_[b]._get_kernel(Xs[b]) for b in range(n_blocks)]
+        Ks = [self.views_[b]._get_kernel(Xs[b]) for b in range(n_views)]
 
         # if self.inform:
         #     assert self.diag_mode == 'A'
@@ -88,26 +88,26 @@ class KMCCA(BaseEstimator, TransformerMixin):
         self.cs_col_norms_ = out['cs_col_norms']
         self.evals_ = out['evals']
 
-        for b in range(n_blocks):
+        for b in range(n_views):
             dv = out['dual_vars'][b]
-            bs = out['block_scores'][b]
+            bs = out['view_scores'][b]
             cent = out['centerers'][b]
-            self.blocks_[b].set_fit_values(dual_vars=dv,
-                                           block_scores=bs,
-                                           centerer=cent,
-                                           X_fit=Xs[b])
+            self.views_[b].set_fit_values(dual_vars=dv,
+                                          view_scores=bs,
+                                          centerer=cent,
+                                          X_fit=Xs[b])
 
         return self
 
     @property
-    def n_blocks_(self):
-        if hasattr(self, 'blocks_'):
-            return len(self.blocks_)
+    def n_views_(self):
+        if hasattr(self, 'views_'):
+            return len(self.views_)
 
     @property
-    def block_scores_(self):
-        if hasattr(self, 'blocks_'):
-            return [blck.block_scores_ for blck in self.blocks_]
+    def view_scores_(self):
+        if hasattr(self, 'views_'):
+            return [blck.view_scores_ for blck in self.views_]
 
     @property
     def n_components_(self):
@@ -119,12 +119,12 @@ class KMCCA(BaseEstimator, TransformerMixin):
         return self.common_norm_scores_
 
     def transform(self, Xs):
-        common_proj = sum(self.blocks_[b].transform(Xs[b])
-                          for b in range(self.n_blocks_))
+        common_proj = sum(self.views_[b].transform(Xs[b])
+                          for b in range(self.n_views_))
         return common_proj * (1 / self.cs_col_norms_)
 
 
-class KMCCABlock(TransformerMixin):
+class KMCCAView(TransformerMixin):
     def __init__(self, kernel='linear', kernel_params=None,
                  filter_params=False, n_jobs=None):
         self.kernel = kernel
@@ -138,9 +138,9 @@ class KMCCABlock(TransformerMixin):
                                 filter_params=True, n_jobs=self.n_jobs,
                                 **self.kernel_params)
 
-    def set_fit_values(self, dual_vars, block_scores, centerer, X_fit):
+    def set_fit_values(self, dual_vars, view_scores, centerer, X_fit):
         self.dual_vars_ = dual_vars
-        self.block_scores_ = block_scores
+        self.view_scores_ = view_scores
         self.centerer_ = centerer
         self.X_fit_ = X_fit
         return self
@@ -165,7 +165,7 @@ _kmcca_docs = dict(Ks=dedent("""
             Whether or not to initially mean center the data. Different options for each data view can be provided by inputting a list of bools.
 
         regs: None, float, list
-            MCCA regularization for each data block, which can be important for kernel methods. A value of 0 or None for all blocks corresponds to SUMCORR-AVGVAR MCCA. A value of 1 corresponds to partial least squares SVD in the case of 2 blocks and a natural generalization of this method for more than two blocks. If a single value (None, float or str) is passed in that value will be used for every block. Different options for each data view can be provided by inputting a list.
+            MCCA regularization for each data view, which can be important for kernel methods. A value of 0 or None for all views corresponds to SUMCORR-AVGVAR MCCA. A value of 1 corresponds to partial least squares SVD in the case of 2 views and a natural generalization of this method for more than two views. If a single value (None, float or str) is passed in that value will be used for every view. Different options for each data view can be provided by inputting a list.
 
     """), diag_mode=dedent("""
         diag_mode: str
@@ -183,14 +183,14 @@ _kmcca_docs = dict(Ks=dedent("""
 
     """), sval_killing=dedent("""
     sval_thresh: float
-        For each block we throw out singular values of (1/n)K that are too small (i.e. zero or essentially zero). Setting this value to be non-zero is how we deal with the singular block gram matrices.
+        For each view we throw out singular values of (1/n)K that are too small (i.e. zero or essentially zero). Setting this value to be non-zero is how we deal with the singular view gram matrices.
 
     signal_ranks: None, int, list
-        Largest SVD rank to compute for each block.
+        Largest SVD rank to compute for each view.
     """), centerers=dedent("""
         centerers: list of sklearn.preprocessing.KernelCenterer
-            The mean centering object for each block.
-    """), kern_basic=_block_kern_docs['basic'], kern_other=_block_kern_docs['other'], score_out=_mcca_docs['score_out'])
+            The mean centering object for each view.
+    """), kern_basic=_view_kern_docs['basic'], kern_other=_view_kern_docs['other'], score_out=_mcca_docs['score_out'])
 
 KMCCA.__doc__ = dedent("""
     Kernel multi-view canonical correlation analysis. Includes options for regularized kernel MCCA and informative kernel MCCA (i.e. where we first compute a low rank kernel PCA).
@@ -212,17 +212,17 @@ KMCCA.__doc__ = dedent("""
 
     Attributes
     ----------
-    blocks_: list of mvdr.mcca.MCCABlock.KMCCABlock
+    views_: list of mvdr.mcca.MCCABlock.KMCCABlock
         Containts the view level data for each data view.
 
     evals_: array-like, (n_components, )
             The MCCA eigenvalues.
 
     common_norm_scores_: array-like, (n_samples, n_components)
-        Normalized sum of the block scores.
+        Normalized sum of the view scores.
 
     cs_col_norms_: array-like, (n_components, )
-        Column nomrs of the sum of the block scores.
+        Column nomrs of the sum of the view scores.
         Useful for projecting new data.
 
     """.format(**_kmcca_docs)
@@ -233,8 +233,8 @@ def k_mcca_evp_svd(Ks, n_components=None, center=True, regs=None,
                    signal_ranks=None, sval_thresh=1e-3, diag_mode='A',
                    precomp_svds=None):
 
-    Ks, n_blocks, n_samples, _ = check_Xs(Ks, multiview=True,
-                                          return_dimensions=True)
+    Ks, n_views, n_samples, _ = check_Xs(Ks, multiview=True,
+                                         return_dimensions=True)
     if sval_thresh is not None:
         # put sval_thresh on the scale of (1/n) K.
         # since we compute SVD of K, put _sval_thresh on scale of svals of K
@@ -242,8 +242,8 @@ def k_mcca_evp_svd(Ks, n_components=None, center=True, regs=None,
     else:
         _sval_thresh = None
 
-    # center data blocks
-    Ks, centerers = center_kernel_blocks(Ks, center=center)
+    # center data views
+    Ks, centerers = center_kernel_views(Ks, center=center)
 
     #######################
     # Compute initial SVD #
@@ -263,19 +263,19 @@ def k_mcca_evp_svd(Ks, n_components=None, center=True, regs=None,
         warn("Requested too many components!")
     n_components = min(n_components, sum(n_features_reduced))
 
-    # get singular values of transformed block gram matrices
-    svals = [np.array(init_svds[b][1]) for b in range(n_blocks)]
-    trans_svals = get_k_mcca_block_gram_svals(svals=svals,
-                                              regs=regs,
-                                              diag_mode=diag_mode,
-                                              n_samples=n_samples)
+    # get singular values of transformed view gram matrices
+    svals = [np.array(init_svds[b][1]) for b in range(n_views)]
+    trans_svals = get_k_mcca_view_gram_svals(svals=svals,
+                                             regs=regs,
+                                             diag_mode=diag_mode,
+                                             n_samples=n_samples)
 
     # constructe matrix for eigen decomposition
-    C = [[None for b in range(n_blocks)] for b in range(n_blocks)]
-    for b in range(n_blocks):
+    C = [[None for b in range(n_views)] for b in range(n_views)]
+    for b in range(n_views):
         C[b][b] = np.eye(n_features_reduced[b])
 
-    for (a, b) in combinations(range(n_blocks), 2):
+    for (a, b) in combinations(range(n_views), 2):
 
         U_a = reduced[a]
         s_a = svals[a]
@@ -295,8 +295,8 @@ def k_mcca_evp_svd(Ks, n_components=None, center=True, regs=None,
     evals, evecs_red = eigh_wrapper(A=C, rank=n_components)
     evecs_red = split(evecs_red, dims=n_features_reduced, axis=0)
 
-    gevecs = [None for b in range(n_blocks)]
-    for b in range(n_blocks):
+    gevecs = [None for b in range(n_views)]
+    for b in range(n_views):
 
         U = reduced[b]
         t = trans_svals[b]
@@ -306,15 +306,15 @@ def k_mcca_evp_svd(Ks, n_components=None, center=True, regs=None,
         # gevecs[b] = (U * (1 / np.sqrt(t))) @ (U.T @ ev)
         gevecs[b] = (U * (1 / np.sqrt(t))) @ ev_red
 
-    block_scores = [Ks[b] @ gevecs[b] for b in range(n_blocks)]
+    view_scores = [Ks[b] @ gevecs[b] for b in range(n_views)]
     common_norm_scores, col_norms = normalize_cols(sum(bs for bs in
-                                                       block_scores))
+                                                       view_scores))
 
     # enforce deterministic output due to possible sign flips
-    common_norm_scores, block_scores, gevecs = \
-        mcca_det_output(common_norm_scores, block_scores, gevecs)
+    common_norm_scores, view_scores, gevecs = \
+        mcca_det_output(common_norm_scores, view_scores, gevecs)
 
-    return {'block_scores': block_scores,
+    return {'view_scores': view_scores,
             'dual_vars': gevecs,
             'common_norm_scores': common_norm_scores,
             'cs_col_norms': col_norms,
@@ -324,7 +324,7 @@ def k_mcca_evp_svd(Ks, n_components=None, center=True, regs=None,
 
 
 k_mcca_evp_svd.__doc__ = dedent("""
-    Computes kernel MCCA using the eigenvector formulation where we compute matrix square roots via SVDs. By throwing out zero singular values of the kernel blocks we can avoid singularity issues.
+    Computes kernel MCCA using the eigenvector formulation where we compute matrix square roots via SVDs. By throwing out zero singular values of the kernel views we can avoid singularity issues.
 
     Parameters
     ----------
@@ -335,7 +335,7 @@ k_mcca_evp_svd.__doc__ = dedent("""
     {sval_killing}
 
     precomp_svds: None, list of tuples
-        Precomputed SVDs of each blocks kernel matrix.
+        Precomputed SVDs of each views kernel matrix.
 
     {diag_mode}
 
@@ -354,14 +354,14 @@ k_mcca_evp_svd.__doc__ = dedent("""
     """).format(**_kmcca_docs)
 
 
-def get_k_mcca_block_gram_svals(svals, regs=None, diag_mode="A",
+def get_k_mcca_view_gram_svals(svals, regs=None, diag_mode="A",
                                 n_samples=None):
 
-    n_blocks = len(svals)
-    regs = check_regs(regs=regs, n_blocks=n_blocks)
+    n_views = len(svals)
+    regs = check_regs(regs=regs, n_views=n_views)
 
-    transf_svals = [None for b in range(n_blocks)]
-    for b in range(n_blocks):
+    transf_svals = [None for b in range(n_views)]
+    for b in range(n_views):
         s = np.array(svals[b])
 
         if regs is None:
@@ -391,8 +391,8 @@ def get_k_mcca_block_gram_svals(svals, regs=None, diag_mode="A",
     return transf_svals
 
 
-get_k_mcca_block_gram_svals.__doc__ = dedent("""
-    Gets the singular values of the block gram matrices for the various options.
+get_k_mcca_view_gram_svals.__doc__ = dedent("""
+    Gets the singular values of the view gram matrices for the various options.
 
     Parameters
     ----------
@@ -402,7 +402,7 @@ get_k_mcca_block_gram_svals.__doc__ = dedent("""
         Singular values of each kernel matrix.
 
     regs: None, float, List
-        Regulariation for each block.
+        Regulariation for each view.
 
     {diag_mode}
 
@@ -412,6 +412,6 @@ get_k_mcca_block_gram_svals.__doc__ = dedent("""
     Output
     ------
     transf_svals: list of array-like
-        Singular values of each block's gram matrix for the given diag_mode.
+        Singular values of each view's gram matrix for the given diag_mode.
 
     """).format(**_kmcca_docs)
