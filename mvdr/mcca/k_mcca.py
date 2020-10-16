@@ -3,6 +3,7 @@ from itertools import combinations
 from warnings import warn
 from textwrap import dedent
 from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.metrics.pairwise import pairwise_kernels
 
 from mvlearn.utils import check_Xs
 
@@ -12,7 +13,6 @@ from mvdr.mcca.block_processing import center_kernel_blocks, split,\
 from mvdr.mcca.mcca import check_regs, mcca_det_output, \
     _mcca_docs
 from mvdr.linalg_utils import eigh_wrapper, normalize_cols
-from mvdr.mcca.MCCABlock import KMCCABlock
 
 
 class KMCCA(BaseEstimator, TransformerMixin):
@@ -122,6 +122,36 @@ class KMCCA(BaseEstimator, TransformerMixin):
         common_proj = sum(self.blocks_[b].transform(Xs[b])
                           for b in range(self.n_blocks_))
         return common_proj * (1 / self.cs_col_norms_)
+
+
+class KMCCABlock(TransformerMixin):
+    def __init__(self, kernel='linear', kernel_params=None,
+                 filter_params=False, n_jobs=None):
+        self.kernel = kernel
+        self.kernel_params = kernel_params
+        self.filter_params = filter_params
+        self.n_jobs = n_jobs
+
+    def _get_kernel(self, X, Y=None):
+
+        return pairwise_kernels(X, Y, metric=self.kernel,
+                                filter_params=True, n_jobs=self.n_jobs,
+                                **self.kernel_params)
+
+    def set_fit_values(self, dual_vars, block_scores, centerer, X_fit):
+        self.dual_vars_ = dual_vars
+        self.block_scores_ = block_scores
+        self.centerer_ = centerer
+        self.X_fit_ = X_fit
+        return self
+
+    def transform(self, X):
+        K = self._get_kernel(X, self.X_fit_)
+        if self.centerer_ is not None:
+            K = self.centerer_.transform(K)
+
+        # TODO: is this right? Do we need additional scaling?
+        return np.dot(K, self.dual_vars_)
 
 
 _kmcca_docs = dict(Ks=dedent("""

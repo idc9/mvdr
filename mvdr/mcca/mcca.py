@@ -12,7 +12,6 @@ from mvlearn.utils import check_Xs
 from mvdr.mcca.block_processing import center_blocks, \
     split, initial_svds
 from mvdr.linalg_utils import eigh_wrapper, svd_wrapper, normalize_cols
-from mvdr.mcca.MCCABlock import MCCABlock
 
 
 class MCCA(BaseEstimator, TransformerMixin):
@@ -94,6 +93,53 @@ class MCCA(BaseEstimator, TransformerMixin):
     def inverse_transform(self, Xs):
         return [self.blocks_[b].inverse_transform(Xs[b])
                 for b in range(self.n_blocks_)]
+
+
+class MCCABlock(TransformerMixin):
+
+    def __init__(self, block_scores, block_loadings, centerer):
+
+        self.block_scores_ = block_scores
+        self.block_loadings_ = block_loadings
+        self.centerer_ = centerer
+
+    def transform(self, X):
+        """
+        Projects a new data matrix onto the block loadings.
+
+        Parameters
+        ----------
+        X: array-like, shape (n_new_samples, n_features)
+            The data to project.
+
+        Output
+        ------
+        scores: array-like, shape (n_new_samples, n_components)
+            The projections of the new data.
+        """
+        return self.centerer_.transform(X).dot(self.block_loadings_)
+
+    def inverse_transform(self, scores):
+        """
+        Transforms scores back to the original space.
+
+        Parameters
+        ----------
+        scores: array-like, shape (n_samples, n_components)
+            The CCA scores.
+
+        Output
+        ------
+        X_hat: array-like, shape (n_samples, n_features)
+            The predictions.
+        """
+
+        reconst = scores.dot(self.loadings_.T)
+
+        m = self.centerer_.mean_
+        if m is not None:
+            reconst += m.reshape(1, -1)
+        return reconst
 
 
 _mcca_docs = dict(
