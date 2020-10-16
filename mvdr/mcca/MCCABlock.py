@@ -49,9 +49,6 @@ class MCCABlock(TransformerMixin):
             reconst += m.reshape(1, -1)
         return reconst
 
-    def fit_transform(self, X, y=None):
-        raise NotImplementedError
-
 
 class KMCCABlock(TransformerMixin):
     def __init__(self, kernel='linear', kernel_params=None,
