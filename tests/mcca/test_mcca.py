@@ -10,7 +10,7 @@ def test_mcca():
     for Xs in generate_mcca_test_data():
         for params in generate_mcca_test_settings():
 
-            n_blocks = len(Xs)
+            n_views = len(Xs)
 
             # check basic usage of mcca_gevp
             out = mcca_gevp(Xs, **params)
@@ -21,7 +21,7 @@ def test_mcca():
             check_mcca_gevp(Xs=Xs, out=out, regs=params['regs'])
 
             # make sure centering went corrently
-            for b in range(n_blocks):
+            for b in range(n_views):
                 assert not out['centerers'][b].with_std
                 if params['center']:
                     assert np.allclose(out['centerers'][b].mean_,
@@ -53,7 +53,7 @@ def test_mcca():
             # check i_mcca when we first do dimensionality reduction
             # with SVD method
             if params['regs'] is None:
-                out = i_mcca(Xs, signal_ranks=[3] * n_blocks,
+                out = i_mcca(Xs, signal_ranks=[3] * n_views,
                              method='svd', **params)
 
                 check_mcca_scores_and_loadings(Xs, out=out,
@@ -62,7 +62,7 @@ def test_mcca():
 
             # check i_mcca when we first do dimensionality reduction
             # with GEVP method
-            out = i_mcca(Xs, signal_ranks=[3] * n_blocks,
+            out = i_mcca(Xs, signal_ranks=[3] * n_views,
                          method='gevp', **params)
 
             check_mcca_scores_and_loadings(Xs, out=out,

@@ -34,44 +34,44 @@ def generate_mcca_test_settings():
 
 def check_mcca_scores_and_loadings(Xs, out,
                                    # common_norm_scores,
-                                   # block_scores, block_loadings,
+                                   # view_scores, view_loadings,
                                    regs=None,
                                    check_normalization=False):
     """
     Checks the scores and loadings output for regularized mcca.
 
-    - block scores are projections of blocks onto loadings
+    - view scores are projections of views onto loadings
     - common noramlized scores are column normalized version of sum of scores
 
     - (optional) check normalization of loadings; this should be done for MCCA, but not for informative MCCA.
     """
 
-    block_loadings = out['block_loadings']
-    block_scores = out['block_scores']
+    view_loadings = out['view_loadings']
+    view_scores = out['view_scores']
     common_norm_scores = out['common_norm_scores']
     centerers = out['centerers']
 
-    Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
-                                                   return_dimensions=True)
+    Xs, n_views, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                  return_dimensions=True)
 
     # make sure to apply centering transformations
-    Xs = [centerers[b].transform(Xs[b]) for b in range(n_blocks)]
+    Xs = [centerers[b].transform(Xs[b]) for b in range(n_views)]
 
-    for b in range(n_blocks):
+    for b in range(n_views):
 
-        # check block scores are projections of blocks onto block loadings
-        assert np.allclose(Xs[b] @ block_loadings[b], block_scores[b])
+        # check view scores are projections of views onto view loadings
+        assert np.allclose(Xs[b] @ view_loadings[b], view_scores[b])
 
     # check common norm scores are the column normalized sum of the
-    # block scores
-    cns_pred = normalize_cols(sum(bs for bs in block_scores))[0]
+    # view scores
+    cns_pred = normalize_cols(sum(bs for bs in view_scores))[0]
     assert np.allclose(cns_pred, common_norm_scores)
 
     if check_normalization:
 
         # concatenated loadings are orthonormal in the inner produce
         # induced by the RHS of the GEVP
-        W = np.vstack(block_loadings)
+        W = np.vstack(view_loadings)
         RHS = get_mcca_gevp_data(Xs, regs=regs)[1]
         assert np.allclose(W.T @ RHS @ W, np.eye(W.shape[1]))
 
@@ -85,22 +85,22 @@ def check_mcca_scores_and_loadings(Xs, out,
 
 def check_mcca_gevp(Xs, out, regs):
     """
-    Checks the block loadings are the correct generalized eigenvectors.
+    Checks the view loadings are the correct generalized eigenvectors.
     """
-    block_loadings = out['block_loadings']
+    view_loadings = out['view_loadings']
     evals = out['evals']
     centerers = out['centerers']
 
-    Xs, n_blocks, n_samples, n_features = check_Xs(Xs, multiview=True,
-                                                   return_dimensions=True)
+    Xs, n_views, n_samples, n_features = check_Xs(Xs, multiview=True,
+                                                  return_dimensions=True)
 
-    regs = check_regs(regs=regs, n_blocks=n_blocks)
+    regs = check_regs(regs=regs, n_views=n_views)
 
     # make sure to apply centering transformations
-    Xs = [centerers[b].transform(Xs[b]) for b in range(n_blocks)]
+    Xs = [centerers[b].transform(Xs[b]) for b in range(n_views)]
 
-    # concatenated block loadings are the eigenvectors
-    W = np.vstack(block_loadings)
+    # concatenated view loadings are the eigenvectors
+    W = np.vstack(view_loadings)
 
     LHS, RHS = get_mcca_gevp_data(Xs, regs=regs)
 
@@ -113,21 +113,21 @@ def check_mcca_gevp(Xs, out, regs):
 
 def check_mcca_class(mcca, Xs):
     assert np.allclose(mcca.common_norm_scores_, mcca.transform(Xs))
-    for b in range(mcca.n_blocks_):
-        assert np.allclose(mcca.blocks_[b].block_scores_,
-                           mcca.blocks_[b].transform(Xs[b]))
+    for b in range(mcca.n_views_):
+        assert np.allclose(mcca.views_[b].view_scores_,
+                           mcca.views_[b].transform(Xs[b]))
 
 
 def compare_kmcca_to_mcca(k_out, mcca_out):
     """
     Kernek MCCA with a linear kernel should give the same output as mcca i.e.
-    the block scores, common normalized scores and evals should all be equal.
+    the view scores, common normalized scores and evals should all be equal.
     """
-    n_blocks = len(mcca_out['block_scores'])
+    n_views = len(mcca_out['view_scores'])
 
-    for b in range(n_blocks):
-        ks = k_out['block_scores'][b]
-        ms = mcca_out['block_scores'][b]
+    for b in range(n_views):
+        ks = k_out['view_scores'][b]
+        ms = mcca_out['view_scores'][b]
 
         assert np.allclose(ks, ms)
 
