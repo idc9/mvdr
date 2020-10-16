@@ -553,8 +553,6 @@ def flag_mean(bases, n_components=None, weights=None):
     flag_mean, svals, block_loadings = svd_wrapper(np.block(bases),
                                                    rank=n_components)
 
-    sqsvals = svals ** 2
-
     # get the block loadings and scores
     block_loadings = split(block_loadings, dims=subspace_dims, axis=0)
     block_scores = [bases[b] @ block_loadings[b]
@@ -564,6 +562,6 @@ def flag_mean(bases, n_components=None, weights=None):
         mcca_det_output(flag_mean, block_scores, block_loadings)
 
     return {'flag_mean': flag_mean,
-            'sqsvals': sqsvals,
+            'sqsvals': svals ** 2,
             'block_scores': block_scores,
             'block_loadings': block_loadings}
