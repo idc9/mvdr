@@ -355,7 +355,7 @@ k_mcca_evp_svd.__doc__ = dedent("""
 
 
 def get_k_mcca_view_gram_svals(svals, regs=None, diag_mode="A",
-                                n_samples=None):
+                               n_samples=None):
 
     n_views = len(svals)
     regs = check_regs(regs=regs, n_views=n_views)
