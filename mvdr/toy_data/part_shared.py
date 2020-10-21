@@ -54,14 +54,13 @@ def sample_part_shared_fact_model(ranks, svals,
     assert len(noise_std) == n_views
 
     # make sure all views are low ranks
-    K_tot, K_shared, view_ranks, view_indiv_ranks = \
-        get_rank_info(n_views=n_views, ranks=ranks)
-    assert n_samples > K_tot
+    rank_info = get_rank_info(n_views=n_views, ranks=ranks)
+    assert n_samples > rank_info['tot']
     for b in range(n_views):
-        assert view_ranks[b] <= n_features[b]
+        assert rank_info['view'][b] <= n_features[b]
 
     # setup scores
-    scores = rng.normal(size=(n_samples, K_tot), scale=1)
+    scores = rng.normal(size=(n_samples, rank_info['tot']), scale=1)
     scores = np.linalg.qr(scores)[0]
     # TODO: give option for U to be iid N(0,1). Need to figure out scaling in this case
     signal_scores = {}
@@ -97,15 +96,15 @@ def sample_part_shared_fact_model(ranks, svals,
             view_signal_mats[b] += U @ diags(sv) @ W.T
 
     # set data views
-    views = [None for b in range(n_views)]
+    Xs = [None for b in range(n_views)]
     for b in range(n_views):
-        views[b] = view_signal_mats[b] + errors[b]
+        Xs[b] = view_signal_mats[b] + errors[b]
 
-    return views, {'ranks': ranks,
-                   'svals': svals,
-                   'signal_scores': signal_scores,
-                   'view_signal_mats': view_signal_mats,
-                   'view_loadings': view_loadings}
+    return Xs, {'ranks': ranks,
+                'svals': svals,
+                'signal_scores': signal_scores,
+                'view_signal_mats': view_signal_mats,
+                'view_loadings': view_loadings}
 
 
 def get_part_shared_struct_ranks(n_views=3, rank=2,
@@ -196,6 +195,14 @@ def get_rank_info(n_views, ranks):
             'shared': K_shared,
             'view': view_ranks,
             'view_indiv': view_indiv_ranks}
+
+# test cases
+# ranks = get_part_shared_struct_ranks(max_size=1)
+# get_rank_info(n_views=3, ranks=ranks)
+# ranks = get_part_shared_struct_ranks(min_size=2)
+# get_rank_info(n_views=3, ranks=ranks)
+# ranks = get_part_shared_struct_ranks()
+# get_rank_info(n_views=3, ranks=ranks)
 
 
 def scale_svals(svals, n_samples, n_features, noise_std, m=1.5):
